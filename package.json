@@ -1,0 +1,15 @@
+{
+  "name": "feedback-kit",
+  "private": true,
+  "description": "Capital OS's feedback module, extracted: a React client, a journal-first server, and an example Next.js app.",
+  "workspaces": [
+    "packages/*",
+    "examples/*"
+  ],
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm test --workspaces --if-present",
+    "dev": "npm run dev -w examples/next-app",
+    "e2e": "npm run e2e -w examples/next-app"
+  }
+}

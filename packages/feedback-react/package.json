@@ -1,0 +1,41 @@
+{
+  "name": "@jbenet/feedback-react",
+  "version": "0.1.0",
+  "description": "The client of feedback-kit: a feedback button and keyboard shortcut, a sidebar with automatic and region screenshots, a WYSIWYG markdown field, per-page drafts, an offline outbox, and the issues pages. Extracted from Capital OS.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": ["*.css"],
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./styles.css": "./src/styles.css"
+  },
+  "files": ["src", "README.md"],
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "peerDependencies": {
+    "react": ">=19",
+    "react-dom": ">=19"
+  },
+  "dependencies": {
+    "@tiptap/extension-image": "^3.31.3",
+    "@tiptap/extension-link": "^3.31.3",
+    "@tiptap/pm": "^3.31.3",
+    "@tiptap/react": "^3.31.3",
+    "@tiptap/starter-kit": "^3.31.3",
+    "modern-screenshot": "^4.7.0",
+    "tiptap-markdown": "^0.9.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "typescript": "^7.0.2"
+  }
+}

@@ -1,0 +1,8 @@
+node_modules/
+.next/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+examples/next-app/.data/
+test-results/
+playwright-report/
