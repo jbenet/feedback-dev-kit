@@ -1,5 +1,5 @@
 /**
- * @jbenet/feedback-react — the feedback box from Capital OS, for any React app.
+ * @jbenet/feedback-react — the feedback box from PL LabOS tools, for any React app.
  *
  * Import the stylesheet once (`@jbenet/feedback-react/styles.css`), wrap the app in a
  * FeedbackProvider (optional), and mount a FeedbackButton in the layout.

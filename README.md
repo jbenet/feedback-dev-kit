@@ -1,6 +1,6 @@
 # feedback-kit
 
-An in-app feedback module for React apps, extracted from Capital OS, where it has filed and tracked
+An in-app feedback module for React apps, extracted from PL LabOS tools, where it has filed and tracked
 every bug report since September 2026. A person presses Alt+F, describes the problem, and files it.
 The report arrives with a screenshot of what they were looking at, the page, its filters and the
 device. It is saved on the server within milliseconds, even when the app is busy or restarting, and

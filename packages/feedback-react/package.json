@@ -1,7 +1,7 @@
 {
   "name": "@jbenet/feedback-react",
   "version": "0.1.0",
-  "description": "The client of feedback-kit: a feedback button and keyboard shortcut, a sidebar with automatic and region screenshots, a WYSIWYG markdown field, per-page drafts, an offline outbox, and the issues pages. Extracted from Capital OS.",
+  "description": "The client of feedback-kit: a feedback button and keyboard shortcut, a sidebar with automatic and region screenshots, a WYSIWYG markdown field, per-page drafts, an offline outbox, and the issues pages. Extracted from PL LabOS tools.",
   "license": "MIT",
   "author": "Juan Benet",
   "type": "module",

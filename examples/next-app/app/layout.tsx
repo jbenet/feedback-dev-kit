@@ -17,7 +17,7 @@ import { Nav } from '@/components/Nav';
 import { UserSwitcher } from '@/components/UserSwitcher';
 import { DEMO_USER_COOKIE, demoUser } from '@/lib/users';
 
-export const metadata: Metadata = { title: 'feedback-kit example', description: 'The feedback box from Capital OS, in a small Next.js app.' };
+export const metadata: Metadata = { title: 'feedback-kit example', description: 'The feedback box from PL LabOS tools, in a small Next.js app.' };
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const user = demoUser((await cookies()).get(DEMO_USER_COOKIE)?.value);

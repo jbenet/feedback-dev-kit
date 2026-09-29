@@ -4,7 +4,7 @@ Both packages share one version.
 
 ## 0.1.0 (29 Sep 2026, unreleased)
 
-The first version, extracted from Capital OS.
+The first version, extracted from PL LabOS tools.
 
 **`@jbenet/feedback-react`**
 

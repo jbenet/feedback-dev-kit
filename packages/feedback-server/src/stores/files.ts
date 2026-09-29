@@ -1,5 +1,5 @@
 /**
- * Files-only store: the Capital OS format. Each issue is `<dir>/NNNN-slug.md` with frontmatter, its
+ * Files-only store: the PL LabOS tools format. Each issue is `<dir>/NNNN-slug.md` with frontmatter, its
  * pictures in `<dir>/attachments/`. The complaint and its fix can travel in one pull request, and
  * `git log issues/` is free triage history.
  *

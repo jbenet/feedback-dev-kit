@@ -1,7 +1,7 @@
 /**
  * The journal: every report is written to disk before the request is answered, and filed later.
  *
- * Why (Capital OS, 27 Sep 2026): the server was pegged by an import and "can't submit feedback";
+ * Why (PL LabOS tools, 27 Sep 2026): the server was pegged by an import and "can't submit feedback";
  * then "it should journal to the server. the page may die or close forever". So the route checks the
  * report, writes it here as one file, and answers 202 at once. Filing — the issue number, the database
  * row, the GitHub issue, the title — happens afterwards, off the request (ingest.ts).

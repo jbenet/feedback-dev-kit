@@ -96,7 +96,7 @@ const Ctx = createContext<ResolvedFeedbackConfig>(resolveConfig());
 
 /**
  * Configuration for every feedback component below it. Optional: without it the components use
- * the defaults (same-origin `/api/feedback`, Alt+F, the Capital OS look).
+ * the defaults (same-origin `/api/feedback`, Alt+F, the PL LabOS tools look).
  */
 export function FeedbackProvider({ children, ...config }: FeedbackConfig & { children: ReactNode }) {
   const {
@@ -130,7 +130,7 @@ export function currentLocation(c: ResolvedFeedbackConfig): { path: string; filt
   };
 }
 
-/** Capital OS's green theme, as an example of a re-skin: pass as `theme`. */
+/** PL LabOS tools' green theme, as an example of a re-skin: pass as `theme`. */
 export const GREEN_THEME: Record<string, string> = {
   '--fbk-ground': '#F1F4F0', '--fbk-ink': '#16201B', '--fbk-muted': '#54605A', '--fbk-line': '#DAE3DC',
   '--fbk-rail': '#11251D', '--fbk-rail-ink': '#E6F0E9', '--fbk-rail-muted': '#8FA298', '--fbk-rail-line': '#1F3B30',

@@ -142,7 +142,7 @@ who can reach the server**, so a real app must supply one from its session, as i
 
 ## 3. Journal first, file later
 
-Capital OS learned this on 27 Sep 2026. The live server is one Node process. During a large import
+PL LabOS tools learned this on 27 Sep 2026. The live server is one Node process. During a large import
 its event loop was busy for minutes, or it was restarting, and the feedback box could not file: the
 person reporting the problem was the one person who could not report it. The first fix kept reports in
 the browser and resent them. The owner's answer was that this was not enough: "it should journal to
@@ -152,7 +152,7 @@ additional servers, mess to deploy."
 So:
 
 - **The web server may be busy with database work.** The route must not touch the database, the auth
-  layer or anything that queues behind them. In Capital OS a property test walks the route's static
+  layer or anything that queues behind them. In PL LabOS tools a property test walks the route's static
   imports and fails if one reaches the database, the modules or auth. Keep that test.
 - **The page may die.** Once the server answers 202, the report must be on disk, fsynced. The browser
   then forgets it, and the tab can close.
@@ -160,7 +160,7 @@ So:
   for as long as it takes. The issue number is shown to the reporter when it exists (the client polls
   the journal).
 
-Measured in Capital OS with the database held by a 25 s transaction: five POSTs with a 182 KB
+Measured in PL LabOS tools with the database held by a 25 s transaction: five POSTs with a 182 KB
 screenshot were answered in 5–28 ms, the journal file was on disk at once, the issue was filed a
 second later, and its database row appeared when the hold ended. With the server frozen (SIGSTOP), the
 report waited in the browser and filed once, about a second after SIGCONT.
@@ -192,7 +192,7 @@ A journal entry:
 }
 ```
 
-Capital OS kept the pictures inline as data URLs in the entry. The kit decodes them to files beside it,
+PL LabOS tools kept the pictures inline as data URLs in the entry. The kit decodes them to files beside it,
 so an entry stays small to read and list.
 
 **Atomic writes.** A write is either absent or complete:
@@ -233,12 +233,12 @@ A loop in the same process as the web server (in Next.js, started from `instrume
   stays in the journal and is retried on the next pass, logged once per entry, not on every pass.
 - **Numbering:** stores that number (files, SQL) take the next number inside a per-store lock, so two
   creates at once cannot take the same one, and a resend racing the first write finds it. Only one
-  server may number a given store. In Capital OS, development checkouts refuse to file at all for this
+  server may number a given store. In PL LabOS tools, development checkouts refuse to file at all for this
   reason.
 - **Attachments:** handed to the store as bytes with a kind and content type. The store names the files
   (`0024-screenshot.png`, `0024-screenshot-2.png`, `0024-image-1.jpg`) and rewrites the body's
   `attachment:N` tokens to their paths using `imageOffset`. A caller can never choose a path.
-- **The database row** (Capital OS writes one to `platform.feedback`, plus an audit entry) is best
+- **The database row** (PL LabOS tools writes one to `platform.feedback`, plus an audit entry) is best
   effort, written after the issue file with a budget of 2 minutes (GUESS) for a busy database. The file
   is the record; the row records that somebody complained, with the context, and survives a
   `git checkout` the way the file survives a database reset.
@@ -295,7 +295,7 @@ interface FeedbackStore {
 
 Files are the default because a coding agent reads them natively (no token, no webhook), the
 complaint and its fix travel in one pull request, and they survive a database reset. If issue text may
-contain confidential data, keep the folder out of git (Capital OS files real-data issues under a
+contain confidential data, keep the folder out of git (PL LabOS tools files real-data issues under a
 git-ignored data folder and only demo issues in the repository).
 
 ## 8. The issue file format
@@ -371,7 +371,7 @@ Rules:
 - `Authorization: Bearer <token>`, compared in constant time (`timingSafeEqual` on equal-length
   buffers); anything else is 401.
 - `since` must be an ISO timestamp with a timezone (`Z` or `±hh:mm`); otherwise 400.
-- It is for pulling feedback from a deployed instance to where the agents work (Capital OS's plan pulls
+- It is for pulling feedback from a deployed instance to where the agents work (PL LabOS tools' plan pulls
   every 60 s and files each item through the local journal). Items include bodies and context, which can
   be sensitive: keep the token in a secret store and rotate it.
 
@@ -446,7 +446,7 @@ GitHub has no API for the private user-attachment uploads the web UI uses
 
 **Privacy warning.** A screenshot shows whatever was on the reporter's screen: names, amounts, private
 notes, other people's data. An issue body is readable by everyone who can read the repository, which for
-a public repository is everyone. Capital OS decided against GitHub issues for its real data for exactly
+a public repository is everyone. PL LabOS tools decided against GitHub issues for its real data for exactly
 this reason: automatic redaction cannot be trusted (names appear as first names, firm names and inside
 screenshots), one miss publishes confidential data to a third party, and a redacted issue is too thin to
 act on. Use GitHub for apps whose screens carry nothing confidential, or with pictures kept `local`.

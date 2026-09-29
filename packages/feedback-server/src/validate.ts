@@ -26,9 +26,9 @@ export function newClientId(): string {
 export interface Limits {
   /** The whole request, in bytes, read before parsing. GUESS: every picture plus generous text. */
   maxRequestBytes: number;
-  /** One picture's base64. As Capital OS. */
+  /** One picture's base64. As PL LabOS tools. */
   maxImageBase64: number;
-  /** Every picture together, base64. GUESS (Capital OS: 40 MB). Over it: 413. */
+  /** Every picture together, base64. GUESS (PL LabOS tools: 40 MB). Over it: 413. */
   maxTotalBase64: number;
   /** How many pictures. GUESS. */
   maxAttachments: number;
@@ -106,7 +106,7 @@ export function checkReport(raw: unknown, limits: Limits = DEFAULT_LIMITS): Chec
     return { ok: false, status: 413, error: `The title is too long (over ${limits.maxTitleChars} characters).` };
   }
 
-  // Pictures: the Capital OS pair (screenshots, images), or one `attachments` list in token order.
+  // Pictures: the PL LabOS tools pair (screenshots, images), or one `attachments` list in token order.
   const listed: Array<{ kind: 'screenshot' | 'image'; name?: string; dataUrl: string }> = [];
   if (Array.isArray(b.attachments) && b.attachments.length > 0) {
     for (const a of b.attachments as unknown[]) {

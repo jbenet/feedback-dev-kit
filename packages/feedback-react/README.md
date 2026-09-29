@@ -1,6 +1,6 @@
 # @jbenet/feedback-react
 
-The client half of feedback-kit: the feedback box from Capital OS, for any React 19 app.
+The client half of feedback-kit: the feedback box from PL LabOS tools, for any React 19 app.
 
 - **A button and a shortcut.** `Alt+F` (Option+F on a Mac) anywhere outside text fields and dialogs.
 - **A sidebar** that opens straight into typing. No title field — the server writes the title.
@@ -155,7 +155,7 @@ The variables: `--fbk-ground --fbk-surface --fbk-ink --fbk-muted --fbk-line --fb
 --fbk-sans --fbk-mono --fbk-drawer-w`. `--fbk-clay` means refused/blocked and should not follow
 the brand colour.
 
-## Differences from Capital OS
+## Differences from PL LabOS tools
 
 - No title field; the server writes titles. The request has no `title`.
 - Endpoints, shortcut, storage names, user label, links and theme are configuration, not imports.
@@ -166,5 +166,5 @@ the brand colour.
 - The automatic capture's "Mis-aligned?" hint is a **Misaligned? Tell us** toggle, recorded with the
   report as `context.capture.misaligned`.
 - The status mark is a line in words that opens the outbox list directly (no popover in between).
-- Capital OS's "filed from the live app" notice for development servers and its connection notes
+- PL LabOS tools' "filed from the live app" notice for development servers and its connection notes
   are not part of the kit.

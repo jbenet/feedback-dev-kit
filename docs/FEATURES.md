@@ -1,10 +1,10 @@
 # Features
 
-A tour of the feedback module: what it does, what it keeps from Capital OS (where it was built), and
+A tour of the feedback module: what it does, what it keeps from PL LabOS tools (where it was built), and
 what the kit adds. Every screenshot was taken from `examples/next-app`, an invented bakery with
 invented people, at 2× in Chromium, by `examples/next-app/scripts/screenshots.mjs`.
 
-One change from Capital OS applies throughout: **there is no Title field.** Capital OS asked for an
+One change from PL LabOS tools applies throughout: **there is no Title field.** PL LabOS tools asked for an
 optional title. The kit never asks. A title is generated on the server from the body, the page and the
 screenshots, by an LLM when one is configured, and otherwise from the first sentence of the body
 (see [SERVER.md](SERVER.md#6-titles)).
@@ -37,7 +37,7 @@ Contents:
 
 - **Feedback** (`FeedbackButton`) sits wherever the app puts it; in the example, in the footer of the
   navigation rail on every page, above the status line and the demo's "Signed in as". Put it in any
-  fallback layout too (Capital OS draws one when the server is too busy to draw navigation), so a
+  fallback layout too (PL LabOS tools draws one when the server is too busy to draw navigation), so a
   report can be filed exactly when things are going wrong.
 - **Alt+F** (Option+F on a Mac) opens it from anywhere. The match is on the physical key
   (`event.code === 'KeyF'`), because on macOS Option+F types `ƒ`. The shortcut does nothing while
@@ -88,11 +88,11 @@ things out, and it does: everything marked `nocapture` (the panel, the scrim, th
 dropped, so the picture shows the page as it was before the panel covered it.
 
 - It is labelled **Drawn from the page**.
-- **Aim: pixel perfect.** In Capital OS it differs from the browser's own screenshot on about 0.05%
+- **Aim: pixel perfect.** In PL LabOS tools it differs from the browser's own screenshot on about 0.05%
   of pixels (anti-aliasing), at the top of a page and scrolled. Getting there took self-hosted
   fonts, a zeroed body margin, sticky and fixed elements moved back to where they are on screen,
   and no phantom scrollbars ([REBUILD.md](REBUILD.md#5-the-capture-pipeline)).
-- **Ask people to say when it is wrong** (the kit's version of Capital OS's "Mis-aligned?" hint).
+- **Ask people to say when it is wrong** (the kit's version of PL LabOS tools' "Mis-aligned?" hint).
   Under every automatic capture is a dotted **Misaligned? Tell us** toggle. Its tooltip says the
   capture is a redraw that can get spacing, wrapping or a form control subtly wrong, and that
   **Whole page** or **Pick a part** take the exact pixels instead. Pressing it marks the screenshot
@@ -152,7 +152,7 @@ unsupported, or it took too long. Everything else still files."
   corner to set a wrap width, double-click to retype. Size is in pixels of the saved image, 8–400,
   typed or picked from presets. Bold on by default.
 - Undo (⌘Z), Redo (⌘⇧Z or ⌘Y), Clear, Cancel and Done. A status line counts the marks.
-- **The toolbar is one row of icon buttons** (a kit change; Capital OS used words). Each has an
+- **The toolbar is one row of icon buttons** (a kit change; PL LabOS tools used words). Each has an
   accessible name and a tooltip with its shortcut, shown on hover and keyboard focus; the active tool
   is marked as well as announced (`aria-pressed`). On a phone the row fits the screen with 44 px
   targets.
@@ -190,7 +190,7 @@ The description is a WYSIWYG markdown editor (TipTap with `tiptap-markdown`):
 
 ## 7. Kind and priority
 
-Both optional, with Capital OS's defaults.
+Both optional, with PL LabOS tools' defaults.
 
 - **Kind:** bug (default), request, question, chore.
 - **Priority:** P0 Blocking (nobody can work around this), P1 Serious (there is a workaround and it
@@ -281,7 +281,7 @@ urgent first, in a glyph and words:
 | — | — | Nothing to say: the line is not drawn. |
 
 A click or tap (not a hover, for touch screens) opens the outbox list. Colour is never the only
-signal; the glyph and the words differ, and changes are announced (`aria-live="polite"`). Capital OS
+signal; the glyph and the words differ, and changes are announced (`aria-live="polite"`). PL LabOS tools
 used a single mark with a popover in between, and its mark also reported background imports; the
 kit's line covers feedback only.
 
@@ -313,7 +313,7 @@ reproduced on the device it was seen on. It is sent as `context` and written int
 
 ![The issues list with status, priority and kind filters](screenshots/16-issues.png)
 
-`IssuesPage` lists every issue (in Capital OS, **Developer → Issues**):
+`IssuesPage` lists every issue (in PL LabOS tools, **Developer → Issues**):
 
 - Four counts at the top: open issues at P0, P1, P2 and P3, each with what it means.
 - An **issue velocity** chart: filed and closed per day for the last 30 days, and the open count,
@@ -323,7 +323,7 @@ reproduced on the device it was seen on. It is sent as `context` and written int
   runs in the browser.
 - Columns: id, title (with reporter and page under it), kind, priority, status, fixed in (links to
   the changelog entry), and filed (relative time).
-**The kit adds**, beyond Capital OS:
+**The kit adds**, beyond PL LabOS tools:
 
 - **Local search.** A search box (focused with `/`) that filters as you type over id, title, body,
   reporter, page and labels, from an index built once in the browser. No request per keystroke. Search
@@ -331,7 +331,7 @@ reproduced on the device it was seen on. It is sent as `context` and written int
 
 ![Search: "harbor" typed after pressing /, two issues shown](screenshots/19-search.png)
 
-- **Status changes from the page.** Capital OS edits status in the issue file; the kit adds a status
+- **Status changes from the page.** PL LabOS tools edits status in the issue file; the kit adds a status
   control on the issue page (open, triaged, agent-ready, in-progress, done) that PATCHes the store,
   keeps unmanaged fields, and records `closed_at` when an issue is closed. The server's `authorize`
   hook decides who may; the example lets any signed-in demo user.
@@ -361,7 +361,7 @@ while signed out is filed as `unknown`; reading issues needs a sign-in.
 
 ## 16. Servers that must not file
 
-Issue numbers are taken in filing order, so only one server may number them. In Capital OS a
+Issue numbers are taken in filing order, so only one server may number them. In PL LabOS tools a
 development checkout's server shows a different panel, "Feedback is filed from the live app", with a
 link to the live app, and its route refuses reports with 403. The kit exposes this as a server option:
 a server that does not file answers 403 with a sentence, and the client shows it.

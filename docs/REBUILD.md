@@ -1,12 +1,12 @@
 # Rebuilding the feedback module from scratch
 
 This is the specification for an agent (or a person) rebuilding the feedback module in any React app
-without the Capital OS source. It describes behaviour, contracts, constants and the failures each
+without the PL LabOS tools source. It describes behaviour, contracts, constants and the failures each
 rule exists to prevent. The server side is in [SERVER.md](SERVER.md); the user-facing tour is in
 [FEATURES.md](FEATURES.md).
 
 Words: **MUST** is required for the acceptance tests in [§14](#14-acceptance-tests) to pass.
-**SHOULD** is what Capital OS does and the kit keeps unless there is a reason. Constants marked
+**SHOULD** is what PL LabOS tools does and the kit keeps unless there is a reason. Constants marked
 **GUESS** were chosen, not measured; keep them unless you measure better ones.
 
 Contents:
@@ -89,7 +89,7 @@ interface FeedbackRequest {
 }
 ```
 
-There is **no title**. (Capital OS sent `title`; the kit's server still accepts one from API callers
+There is **no title**. (PL LabOS tools sent `title`; the kit's server still accepts one from API callers
 and keeps it.)
 
 **Attachment numbering.** The server lays attachments out as `[...screenshots, ...images]`. The body
@@ -214,7 +214,7 @@ links open in a new tab with `rel="noreferrer"`.
 there is nothing to say. A click (not a hover, for touch screens) opens `OutboxList`
 (`role="dialog" aria-label="Feedback waiting to file"`), anchored above the chip, with each waiting
 report and **Retry now**, **Copy text** and **Discard**. It closes on Esc and on a scrim click.
-[§10.6](#106-what-the-status-mark-says) gives the words. (Capital OS put a popover with **Show the
+[§10.6](#106-what-the-status-mark-says) gives the words. (PL LabOS tools put a popover with **Show the
 notes** between the mark and the list; the kit opens the list directly.)
 
 ### 3.9 `KeyboardShortcuts`
@@ -721,7 +721,7 @@ Kit addition: a status `<select>` that PATCHes and shows the saved state; the se
 - **Focus.** On open, focus the description. Trap Tab and Shift+Tab inside the panel (wrap from last to
   first and back; when focus is outside, go to the first or last), skipping elements with no client rects
   and anything under `[inert]`. On close, return focus to the opener unless the user has moved it
-  elsewhere on purpose. Capital OS has this helper (`useModalSheet`) for its navigation sheet but the
+  elsewhere on purpose. PL LabOS tools has this helper (`useModalSheet`) for its navigation sheet but the
   feedback drawer does not use it; **the kit MUST**.
 - Toggle buttons use `aria-pressed`; disclosure buttons `aria-expanded`.
 - Icon-only buttons have `aria-label` (× is "Remove screenshot N", "Remove this picture", "Close").
@@ -740,7 +740,7 @@ Kit addition: a status `<select>` that PATCHes and shows the saved state; the se
   `--fbk-rail-ink`, `--fbk-rail-muted`, `--fbk-rail-text`, `--fbk-rail-line`, `--fbk-rail-edge`,
   `--fbk-rail-soft`, `--fbk-rail-raise`, `--fbk-rail-hover`, `--fbk-rail-dim`, `--fbk-rail-av`. Override
   them in CSS (`.fbk { --fbk-accent: … }`) or with the provider's `theme` prop. The default values are
-  Capital OS's.
+  PL LabOS tools'.
 - **Layout.** Drawer 420 px, `position: fixed; top/right/bottom: 0`, scrim `rgba(26,25,23,.28)`; phone
   (≤ 760 px) full width with safe-area padding. The keys card sits to the left of the drawer
   (`right: calc(var(--fbk-drawer-w, 420px) + 26px)`), top-right on narrow screens. Use `innerHeight` (set a
@@ -770,7 +770,7 @@ lists what the kit automates today and what it cannot automate headless.
    it (sample a pixel where the panel was: it matches the page).
 6. Pixel test: on a fixture page with self-hosted fonts, a sticky header, a scrolled position (700 px)
    and a table taller than the viewport, the redraw differs from `page.screenshot()` on under 0.5% of
-   pixels (GUESS threshold; Capital OS measured 0.05%).
+   pixels (GUESS threshold; PL LabOS tools measured 0.05%).
 7. A page whose redraw never resolves: the panel comes back within 12 s and still files.
 8. With `getDisplayMedia` stubbed to reject, Whole page falls back to the redraw; stubbed to return a
    frame of the wrong aspect, Pick a part draws the region from the page and says so.
@@ -862,7 +862,7 @@ Not automated, because a headless browser cannot do it:
   protocol). Test on a real iPad and a Mac before a release; Safari-only reports cannot be reproduced
   here.
 - **Redraw fidelity** (6). The pixel comparison against `page.screenshot()` is not in the suite; the
-  0.05% figure was measured in Capital OS.
+  0.05% figure was measured in PL LabOS tools.
 
 Not automated yet, though they could be: 2, 4, 13 (comparing bytes), 14, 16, 19 (SIGSTOP), 21–24, and
 the client-side properties 28–32.

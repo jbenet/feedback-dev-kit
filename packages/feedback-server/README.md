@@ -86,7 +86,7 @@ startFeedbackIngester();
 The issue routes are also served under `/api/feedback/issues…` and `/api/feedback/attachments/…`, so
 one catch-all route can carry everything. Paths are set by `basePath` and `issuesPath`.
 
-**POST body.** This is the Capital OS request without the title:
+**POST body.** This is the PL LabOS tools request without the title:
 `{ clientId, body, kind?, priority?, page, context, screenshots: [pngDataUrl], images: [{ name?, dataUrl }], imageOffset }`.
 The server also accepts `client_id`, an optional `title` (from agents filing through the API), and
 `attachments: [{ kind, name?, dataUrl }]` in place of `screenshots` plus `images`. See
@@ -163,7 +163,7 @@ Every store implements `FeedbackStore` (`create`, `list`, `get`, `update`, `read
 filed, and `RetryLaterError(ms)` to ask for a wait. Any other throw is retried. A report is never
 dropped.
 
-### Files (the Capital OS format)
+### Files (the PL LabOS tools format)
 
 ```ts
 const store = fileStore({ dir: 'data/issues' });

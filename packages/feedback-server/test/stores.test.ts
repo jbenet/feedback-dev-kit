@@ -53,7 +53,7 @@ async function contract(store: FeedbackStore) {
   assert.equal(await store.get('9999'), null);
 }
 
-test('files store: the Capital OS format, numbering, dedupe, pictures and updates', async (t) => {
+test('files store: the PL LabOS tools format, numbering, dedupe, pictures and updates', async (t) => {
   const dir = await tempDir(t);
   const store = fileStore(dir);
   await contract(store);

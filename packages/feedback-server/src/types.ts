@@ -1,7 +1,7 @@
 /**
  * The shapes shared by the handlers, the journal, the ingester and the stores.
  *
- * The wire format is Capital OS's /api/feedback request, minus the title: the client never asks
+ * The wire format is PL LabOS tools' /api/feedback request, minus the title: the client never asks
  * for one. A title may still be sent (an agent filing through the API), and is then kept.
  */
 

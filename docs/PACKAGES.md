@@ -1,6 +1,6 @@
 # Packages
 
-What the feedback module depends on, the versions Capital OS runs (installed versions as of
+What the feedback module depends on, the versions PL LabOS tools runs (installed versions as of
 29 Sep 2026), and why each is there. Everything else (the outbox, drafts, the journal, the region
 picker, the annotation editor, the markdown renderer, the frontmatter reader and writer) is written
 by hand on browser and Node built-ins, on purpose: each is small, and each had bugs a library would
@@ -8,7 +8,7 @@ have hidden.
 
 ## Client (`packages/feedback-react`)
 
-| Package | Version in Capital OS | Kind | Why |
+| Package | Version in PL LabOS tools | Kind | Why |
 |---|---|---|---|
 | `react`, `react-dom` | 19.3.0 | peer | Components, portals (`createPortal` to `<body>`), `useSyncExternalStore` for the outbox state. React 18 should work; 19 is what is tested. |
 | `modern-screenshot` | 4.7.0 | dependency, loaded with a dynamic `import()` when the first capture runs | The automatic screenshot: `domToPng` clones the DOM into an SVG `foreignObject` and rasterises it. Unlike `html2canvas`, which re-implements CSS layout in JavaScript, it lets the browser lay the page out, so modern CSS draws as it does on screen. The hooks the capture depends on: `onCloneEachNode` (fix overflow, table heights, pinned elements), `onCreateForeignObjectSvg` (inject a rule), `filter` (redaction and culling), `features.restoreScrollPosition`, per-resource `timeout`. |
@@ -26,7 +26,7 @@ library (`crypto.randomUUID`, with a `getRandomValues` fallback for plain http);
 
 ### Fonts (host app)
 
-The redraw can only embed fonts from same-origin stylesheets. Capital OS self-hosts its fonts from
+The redraw can only embed fonts from same-origin stylesheets. PL LabOS tools self-hosts its fonts from
 `@fontsource/ibm-plex-sans` 5.3.0, `@fontsource/ibm-plex-mono` 5.3.0 and
 `@fontsource-variable/fraunces` 5.3.0 (Latin subsets). Before that, fonts came from Google Fonts,
 the capture fell back to wider fonts, and text re-wrapped. Any app using the kit should self-host its
@@ -38,7 +38,7 @@ optional.
 | Package | Version | Kind | Why |
 |---|---|---|---|
 | Node.js | ≥ 20 | runtime | `node:fs/promises` (`open` with `wx`, `FileHandle.sync`, `link`, `rename`), `node:crypto` (`randomBytes`, `timingSafeEqual`, `createHash`). The journal and the files store need nothing else. |
-| `next` | 16.3.5 in Capital OS | optional peer | Route handler adapters and `instrumentation.ts` to start the ingester. A plain Node adapter is included for anything else. |
+| `next` | 16.3.5 in PL LabOS tools | optional peer | Route handler adapters and `instrumentation.ts` to start the ingester. A plain Node adapter is included for anything else. |
 | `better-sqlite3` | ≥ 11 (13.0.3 in development) | optional peer | The SQLite store. |
 | `pg` | ≥ 8 (8.23.0 in development) | optional peer | The Postgres store. |
 | `@anthropic-ai/sdk` | ≥ 0.60 (0.129.0 in development) | optional peer | The AI title adapter. Any model can be used through the title hook instead. |

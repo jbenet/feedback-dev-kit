@@ -39,7 +39,7 @@ export interface IngesterOptions {
    * Without it, the captured selector is used as the handle.
    */
   identify?: (selector: string | null, entry: JournalEntry) => Promise<Reporter | null>;
-  /** GUESS (Capital OS): often enough that a missed kick costs seconds. Default 10 s. */
+  /** GUESS (PL LabOS tools): often enough that a missed kick costs seconds. Default 10 s. */
   everyMs?: number;
   /** Delay after the nth failure of one entry. Default 2 s, 10 s, 30 s, 2 min, then every 5 min (GUESS). */
   backoff?: (attempts: number) => number;

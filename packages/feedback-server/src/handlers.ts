@@ -50,7 +50,7 @@ export interface HandlerOptions {
   origin?: OriginPolicy | false;
   limits?: Partial<Limits>;
   /**
-   * Whether this server files reports. Capital OS refuses on development copies so two servers never
+   * Whether this server files reports. PL LabOS tools refuses on development copies so two servers never
    * hand out the same issue numbers; the browser's outbox keeps the report until the right server
    * takes it. Default true.
    */

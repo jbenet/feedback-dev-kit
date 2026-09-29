@@ -1,6 +1,6 @@
 # Triage: how dev agents work the feedback queue
 
-How feedback turns into fixes when coding agents do most of the work in the background, as Capital OS
+How feedback turns into fixes when coding agents do most of the work in the background, as PL LabOS tools
 has run it since September 2026 (114 issues filed in the first four days, 97 of them closed with a
 "Done" note), and the policy it settled on. Adapt the roles to your team; keep the shape.
 
@@ -36,7 +36,7 @@ report filed ─▶ triage (class, evidence, why) ─▶ A: fix now ────
   or commit: `**Done (N30).** The list filters by status, priority and kind in the browser…`, or
   `fixed_in: <commit>` in the frontmatter. The issues page links it.
 
-Latency targets Capital OS set (GUESSES to measure): report to triaged within 15 minutes; a class-A fix
+Latency targets PL LabOS tools set (GUESSES to measure): report to triaged within 15 minutes; a class-A fix
 running on the owner's instance within the hour; live for the team at the next release.
 
 ## 2. Four classes
@@ -63,7 +63,7 @@ The classifier is conservative:
 
 ## 3. Roles → outcomes
 
-Who filed it decides what an agent may do without asking. Capital OS has three roles: admin, member
+Who filed it decides what an agent may do without asking. PL LabOS tools has three roles: admin, member
 (a full user) and viewer; the owner is the admin who makes product decisions.
 
 | | Owner / admin | Member | Viewer | Agent-filed (a monitor, a test) |
@@ -120,7 +120,7 @@ them.
 | `in-progress` | A builder has it; `assignee:` and `branch:` in the frontmatter. |
 | `done` | Fixed and verified, with a closing note and the version or commit. |
 
-**Mark fixed issues done, not "review"** (the owner, Capital OS issue 0061). A `review` state
+**Mark fixed issues done, not "review"** (the owner, PL LabOS tools issue 0061). A `review` state
 accumulated issues nobody went back to; the fix is verified before it merges, so the issue closes when
 it merges. The file reader still maps a legacy `review` to `done`.
 
@@ -147,7 +147,7 @@ A UI fix involves screenshots and trial and error, which bloats the context of w
 fix runs in a scoped sub-agent with its own everything:
 
 1. **Isolated git worktree** on its own branch, so parallel fixers never touch each other's files.
-2. **Its own demo server** on a free port from a reserved range (Capital OS: 3110–3119), seeded with
+2. **Its own demo server** on a free port from a reserved range (PL LabOS tools: 3110–3119), seeded with
    invented data. Never the live server, never real data. A worktree's server files no feedback (only
    the live server numbers issues).
 3. **Read set:** the project's rules, the issue file it was given (and nothing else confidential), the

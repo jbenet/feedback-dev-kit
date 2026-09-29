@@ -3,7 +3,7 @@
  *
  * Everything is scoped under `.fbk`, the class on every root the kit draws (the launcher, the
  * portalled drawer, the outbox list, the issue components), so the host's styles and these do
- * not reach into each other. The look is Capital OS's: warm paper ground, ink, one accent colour.
+ * not reach into each other. The look is PL LabOS tools': warm paper ground, ink, one accent colour.
  *
  * Re-skin with the variables below. They are declared on `:where(.fbk)`, which has no
  * specificity, so any of these win without `!important`:
@@ -42,7 +42,7 @@
 /* The launcher's wrapper draws nothing: the button sits in the host's layout as if unwrapped. */
 .fbk-launch{display:contents}
 
-/* ---------------- extracted from Capital OS ---------------- */
+/* ---------------- extracted from PL LabOS tools ---------------- */
 .fbk .mono{font-family:var(--fbk-mono)}
 /* Issue 0016. Muted grey, 10px, regular weight, wide tracking: it passed the contrast ratio
    and was still hard to see, because small uppercase mono in a light weight reads as a

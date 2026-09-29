@@ -213,7 +213,7 @@ test('authorize guards reads, updates and pictures', async (t) => {
 });
 
 test('the POST route loads nothing that opens or waits on a store or database', () => {
-  // Capital OS keeps this as a property: the journal must answer while the database is busy.
+  // PL LabOS tools keeps this as a property: the journal must answer while the database is busy.
   const src = join(dirname(fileURLToPath(import.meta.url)), '..', 'src');
   const seen = new Set<string>();
   const todo = [join(src, 'handlers.ts')];

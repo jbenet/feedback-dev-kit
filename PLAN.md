@@ -1,6 +1,6 @@
 # feedback-kit — build plan (shared by the agents building it)
 
-Extracted from Capital OS, 29 Sep 2026; Capital OS's source was the source of truth for behaviour.
+Extracted from PL LabOS tools, 29 Sep 2026; PL LabOS tools' source was the source of truth for behaviour.
 Never copy its data: screenshots, examples and tests use invented data only.
 
 ## Layout
@@ -18,7 +18,7 @@ packages/feedback-server/     server: handlers (framework-agnostic + Next adapte
 examples/next-app/            a small Next.js app wiring both packages; e2e tests (Playwright)
 ```
 
-## Wire contract (keep the current Capital OS format, minus title)
+## Wire contract (keep the current PL LabOS tools format, minus title)
 - The client never asks for a title. The server (or a background agent) generates one with an LLM from the
   body, page and screenshots; fallback: first line of the body, trimmed to 80 chars.
 - POST {base}/api/feedback — the current app/api/feedback/route.ts request shape (body markdown, page,
@@ -30,6 +30,6 @@ examples/next-app/            a small Next.js app wiring both packages; e2e test
 
 ## Rules for the builders
 - Framework: React + TypeScript; server handlers work in Next.js route handlers and plain Node (adapter).
-- Keep the Capital OS look as the default theme, via CSS variables so apps can re-skin.
-- No Capital OS imports; everything the package needs lives in the package or is a documented peer dep.
+- Keep the PL LabOS tools look as the default theme, via CSS variables so apps can re-skin.
+- No PL LabOS tools imports; everything the package needs lives in the package or is a documented peer dep.
 - Invented data only. Commit to this repo (main); never push.
