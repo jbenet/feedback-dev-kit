@@ -36,13 +36,18 @@ export type GitHubAttachments =
 export interface GitHubStoreOptions {
   /** `owner/name` of the repository that gets the issues. */
   repo: string;
-  /** Default: FEEDBACK_GITHUB_TOKEN, then GITHUB_TOKEN. Needs issues: write (and contents: write for 'repo' pictures). */
-  token?: string;
+  /**
+   * Default: FEEDBACK_GITHUB_TOKEN, then GITHUB_TOKEN. Needs issues: write (and contents: write for 'repo' pictures).
+   * A function is called before each request, for tokens that rotate (a GitHub App's) or arrive later.
+   */
+  token?: string | (() => string | undefined);
   /** Local mirror folder (absolute, or relative to process.cwd()). */
   dir: string;
   attachments?: GitHubAttachments;
   /** Every issue gets this label, plus kind:*, priority:*, status:*. Default 'feedback'. */
   label?: string;
+  /** The sentence the issues pages show for where issues go. Default names the repository and the mirror folder. */
+  destination?: string;
   apiUrl?: string;
   fetch?: typeof fetch;
   /** Longest rate-limit wait taken inline; a longer one is handed to the ingester's backoff. Default 60 s. */
@@ -80,7 +85,8 @@ export function githubStore(options: GitHubStoreOptions): FeedbackStore & { file
   const pictures: GitHubAttachments = options.attachments ?? { mode: 'local' };
   const files = fileStore({ dir: options.dir, now });
   const syncFile = join(files.root, '.github-sync.json');
-  const token = () => options.token ?? process.env.FEEDBACK_GITHUB_TOKEN ?? process.env.GITHUB_TOKEN ?? '';
+  const token = () => (typeof options.token === 'function' ? options.token() : options.token)
+    ?? process.env.FEEDBACK_GITHUB_TOKEN ?? process.env.GITHUB_TOKEN ?? '';
   let lastWrite = 0;
   let assetsPrivate: boolean | null = null;
   let warnedPublic = false;
@@ -236,7 +242,7 @@ export function githubStore(options: GitHubStoreOptions): FeedbackStore & { file
   const store = {
     kind: 'github',
     files,
-    destination: `GitHub issues in ${options.repo}, mirrored in ${options.dir}`,
+    destination: options.destination ?? `GitHub issues in ${options.repo}, mirrored in ${options.dir}`,
 
     // Serial per mirror, so two passes cannot both miss the marker and both create.
     create: (draft: IssueDraft) => serially(files.root, async (): Promise<Issue & { repeat?: boolean }> => {

@@ -212,7 +212,8 @@ const store = githubStore({
 });
 ```
 
-- **Token.** Read from `FEEDBACK_GITHUB_TOKEN`, then `GITHUB_TOKEN`. Use a fine-grained token or a
+- **Token.** The `token` option (a string, or a function asked before each request, for a GitHub App's
+  rotating token or one that arrives after start), else `FEEDBACK_GITHUB_TOKEN`, then `GITHUB_TOKEN`. Use a fine-grained token or a
   GitHub App token for this one repository, with Issues read/write and Metadata read. Add Contents
   read/write only for `repo` pictures, and only on the assets repository. With no token, reports wait
   in the journal.

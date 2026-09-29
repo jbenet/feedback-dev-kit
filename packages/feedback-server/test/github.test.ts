@@ -241,3 +241,22 @@ test('no token: the create fails (and is retried by the ingester), never silentl
   const store = githubStore({ repo: 'acme/app', dir, fetch: (async () => { throw new Error('must not be called'); }) as typeof fetch });
   await assert.rejects(store.create(draft()), /No GitHub token/);
 });
+
+test('a token function is asked on each request, so a token that arrives later (or rotates) is used', async (t) => {
+  const dir = await tempDir(t);
+  const saved = [process.env.FEEDBACK_GITHUB_TOKEN, process.env.GITHUB_TOKEN];
+  delete process.env.FEEDBACK_GITHUB_TOKEN;
+  delete process.env.GITHUB_TOKEN;
+  t.after(() => {
+    if (saved[0] !== undefined) process.env.FEEDBACK_GITHUB_TOKEN = saved[0];
+    if (saved[1] !== undefined) process.env.GITHUB_TOKEN = saved[1];
+  });
+  const gh = fakeGitHub();
+  let current: string | undefined;
+  const store = base(dir, gh, { token: () => current });
+  await assert.rejects(store.create(draft()), /No GitHub token/);
+  assert.equal(gh.log.length, 0);
+  current = 'invented-token';
+  const issue = await store.create(draft());
+  assert.equal(issue.id, '0001');
+});
