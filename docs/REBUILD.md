@@ -177,9 +177,10 @@ generation: number       // bumped per loaded draft; used as the MarkdownField's
 ```
 
 Layout, top to bottom (narrow) or in two columns (wide: `grid-template-columns: minmax(0,1.45fr)
-minmax(300px,1fr)`, width `min(1120px, 80vw)`): header (label, Drafts · N, Wider/Narrower), heading
-and one sentence, screenshots column (list, Whole page, Pick a part, hint, failure line), text column
-(restored-draft line, description, kind and priority, the priority's meaning, the failure box), actions
+minmax(300px,1fr)`, width `min(1120px, 80vw)`): header (the panel's own `<h2>` "Feedback", Drafts · N,
+Wider/Narrower — no intro sentence under it), screenshots column (list, Whole page, Pick a part, a
+`(?)` help toggle, failure line), text column (restored-draft line, description, kind and priority —
+each priority's meaning is in its own `<option>`, not a paragraph, the failure box), actions
 (File it, Cancel), key hint, folded context (`<details>` with the JSON, `JSON.stringify(context, null, 2)`).
 
 **File it** is disabled while `body.trim() === ''`, while saving, and while `imagesPending`.
@@ -192,9 +193,13 @@ top`) that opens the annotator, an overlay bar with **✎ Annotate** and **×**
 `Captured from your screen`), an `annotated` flag, and, for `render` shots only, a
 **Misaligned? Tell us** toggle button (`aria-pressed`; it reads "Misaligned · noted" when on) whose
 `title` explains the redraw and points to the exact buttons. The flagged screenshots' numbers go in
-`context.capture.misaligned`, and a line thanks the reporter and says Whole page gives exact pixels. Under the buttons: "Optional — the complaint files without one." when empty, else "Adds
-another; it does not replace what is already here." plus "Both buttons use your browser's screen
-capture for exact pixels, and it will ask permission."
+`context.capture.misaligned`, and a line thanks the reporter and says Whole page gives exact pixels.
+Beside the two buttons, a `(?)` (`role="note"`, focusable, `aria-label="About screenshots"`) carries
+what used to be a paragraph under them, as its `title`: "Optional — the report files without one."
+when empty, else "Adds another; it does not replace what is already here." plus "Both use your
+browser's screen capture for exact pixels where it can, and it will ask permission." plus "Click a
+screenshot to annotate it; use its × to delete it." It shows on hover or keyboard focus rather than
+sitting on the page unasked.
 
 ### 3.4 `RegionPicker` — [§6](#6-the-region-picker). 3.5 `ShotEditor` — [§7](#7-the-annotation-editor). 3.6 `MarkdownField` — [§8](#8-the-markdown-field).
 
@@ -740,7 +745,14 @@ Kit addition: a status `<select>` that PATCHes and shows the saved state; the se
   `--fbk-rail-ink`, `--fbk-rail-muted`, `--fbk-rail-text`, `--fbk-rail-line`, `--fbk-rail-edge`,
   `--fbk-rail-soft`, `--fbk-rail-raise`, `--fbk-rail-hover`, `--fbk-rail-dim`, `--fbk-rail-av`. Override
   them in CSS (`.fbk { --fbk-accent: … }`) or with the provider's `theme` prop. The default values are
-  PL LabOS tools'.
+  PLC green (`--fbk-accent: #1E8F5E`, a dark green `--fbk-rail`), not PL LabOS tools' clay; PL LabOS
+  tools' palette is still available as the exported `GREEN_THEME` constant for a re-skin the other
+  direction (naming aside, it now matches the default — kept as a documented example of the `theme`
+  prop's shape, not because it changes anything).
+- **Focus ring on the description.** `.mdfield:focus-within` gets `--fbk-accent`'s border colour and a
+  colour-mixed box-shadow (`color-mix(in srgb, var(--fbk-accent) 22%, transparent)`), so the field the
+  cursor is in is visually obvious the instant the panel opens (it also has initial focus, [§11](#11-keyboard)).
+  Respects `prefers-reduced-motion` (no transition).
 - **Layout.** Drawer 420 px, `position: fixed; top/right/bottom: 0`, scrim `rgba(26,25,23,.28)`; phone
   (≤ 760 px) full width with safe-area padding. The keys card sits to the left of the drawer
   (`right: calc(var(--fbk-drawer-w, 420px) + 26px)`), top-right on narrow screens. Use `innerHeight` (set a

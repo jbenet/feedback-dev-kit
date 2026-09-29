@@ -144,7 +144,7 @@ try {
   await box.locator('summary', { hasText: 'Captured with it' }).click();
 
   // The description: markdown typed as markdown, a list, a dropped picture; then its source.
-  const editor = page.getByRole('textbox', { name: 'What happened' });
+  const editor = page.getByRole('textbox', { name: 'Enter any feedback' });
   await editor.click();
   await page.keyboard.press('ControlOrMeta+a');
   await page.keyboard.press('Backspace');

@@ -114,8 +114,8 @@ Every prop is optional; without a provider the defaults apply.
 | `shortcut` | `{ code: 'KeyF', alt: true }` | The open-the-box keys. `code` is the physical key; `mod` is ⌘ on Apple, Ctrl elsewhere. |
 | `storagePrefix` | `feedbackkit` | Names of the localStorage keys and IndexedDB databases. |
 | `issueHref(id)` | `/issues/<id>` | Where "Filed as issue N" and list rows link. |
-| `theme` | `{}` | CSS variable overrides, applied inline on every root the kit draws. `GREEN_THEME` is an example. |
-| `destinationNote` | "Filed with the issue on the server." | One sentence under the screenshots. |
+| `theme` | `{}` | CSS variable overrides, applied inline on every root the kit draws, on top of the default PLC green theme. `GREEN_THEME` is an example (see [Theming](#theming)). |
+| `destinationNote` | "Filed with the issue on the server." | Accepted for compatibility; not currently rendered (the sentence it fed was removed from the panel — see the changelog). |
 | `pathname`, `search` | `window.location` | The page, from your router, so client-side navigation is seen. |
 
 `openFeedback()` opens the box from any control of your own.
@@ -139,21 +139,26 @@ Anything in your app marked with the class `nocapture` is left out of the automa
 
 ## Theming
 
+**The default theme is PLC green** (`--fbk-accent: #1E8F5E`, a dark green `--fbk-rail`) — the colour
+of the focus ring on the description field, the primary button, and the rail in the example app.
+
 All styles are scoped under `.fbk`, the class on every root the kit draws, and read CSS variables
-declared on `:where(.fbk)` (no specificity), so either of these re-skins it:
+declared on `:where(.fbk)` (no specificity), so either of these re-skins it, away from that default,
+to (say) a blue brand:
 
 ```css
-.fbk { --fbk-accent: #1E8F5E; --fbk-ground: #F1F4F0; }
+.fbk { --fbk-accent: #2563EB; --fbk-ground: #F1F5F9; }
 ```
 ```tsx
-<FeedbackProvider theme={{ '--fbk-accent': '#1E8F5E' }}>
+<FeedbackProvider theme={{ '--fbk-accent': '#2563EB' }}>
 ```
 
 The variables: `--fbk-ground --fbk-surface --fbk-ink --fbk-muted --fbk-line --fbk-hair --fbk-tint
 --fbk-label --fbk-accent --fbk-accent-ink --fbk-accent-soft --fbk-accent-line --fbk-accent-wash
 --fbk-accent-halo --fbk-clay --fbk-green --fbk-purple --fbk-amber --fbk-rail* --fbk-display
 --fbk-sans --fbk-mono --fbk-drawer-w`. `--fbk-clay` means refused/blocked and should not follow
-the brand colour.
+the brand colour. `GREEN_THEME` (exported alongside the components) holds the default's own values,
+as a worked example of the shape a `theme` object takes.
 
 ## Differences from PL LabOS tools
 
@@ -166,5 +171,10 @@ the brand colour.
 - The automatic capture's "Mis-aligned?" hint is a **Misaligned? Tell us** toggle, recorded with the
   report as `context.capture.misaligned`.
 - The status mark is a line in words that opens the outbox list directly (no popover in between).
+- No intro prose: the panel's heading is just "Feedback", the description field is labelled "Enter
+  any feedback:", and the screenshot buttons' explanation lives in a `(?)` tooltip instead of a
+  paragraph. The priority dropdown's own options carry what each priority means.
+- The default theme is PLC green, not PL LabOS tools' clay; the description field also gets a visible
+  focus ring in the theme's accent colour.
 - PL LabOS tools' "filed from the live app" notice for development servers and its connection notes
   are not part of the kit.

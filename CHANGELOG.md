@@ -2,6 +2,27 @@
 
 Both packages share one version.
 
+## 0.1.1 (29 Sep 2026, unreleased)
+
+The feedback sheet, per Juan's review of 0.1.0.
+
+**`@jbenet/feedback-react`**
+
+- The panel's header is its own heading, "Feedback" (larger than the other labels); the "What went
+  wrong?" heading and its intro paragraph are gone — the fields speak for themselves.
+- The explanation that used to sit under **Whole page** / **Pick a part** as a paragraph is now a
+  `(?)` tooltip beside them, shown on hover or keyboard focus.
+- The description field's label is "Enter any feedback:" (`aria-label="Enter any feedback"`), not
+  "What happened"; its placeholder has no blank line before "Markdown works…". The field gets a
+  visible focus ring in the theme's accent colour the instant the cursor is inside it.
+- The line explaining what the chosen priority means, under Kind/Priority, is gone; each priority's
+  meaning is still in its own option in the Priority dropdown.
+- **The default theme is PLC green** (`--fbk-accent: #1E8F5E`, a dark green rail), not PL LabOS
+  tools' clay. Re-skin with `--fbk-*` CSS variables, in a stylesheet or `FeedbackProvider`'s `theme`
+  prop, same as before.
+- `<html suppressHydrationWarning>` is now documented as required: the kit sets `--app-h` on `<html>`
+  before React hydrates.
+
 ## 0.1.0 (29 Sep 2026, unreleased)
 
 The first version, extracted from PL LabOS tools.

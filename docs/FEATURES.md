@@ -56,13 +56,12 @@ Contents:
 The panel is a drawer on the right, 420 px wide, over a dimmed scrim. On a phone it takes the
 full width. From top to bottom:
 
-- **Header:** the label "Feedback", a **Drafts · N** button when unsent drafts from other pages
-  exist ([8](#8-drafts)), and **Wider / Narrower**.
-- **"What went wrong?"** and one sentence: a description is enough; the page and filters are filled
-  in; filing saves it on the server at once, or keeps it in the browser if the server cannot be
-  reached.
+- **Header:** the panel's own heading, "Feedback" (an `<h2>`, set larger than the other labels), a
+  **Drafts · N** button when unsent drafts from other pages exist ([8](#8-drafts)), and
+  **Wider / Narrower**. There is no intro sentence — the fields speak for themselves, and filing
+  saves it on the server at once, or keeps it in the browser if the server cannot be reached.
 - **Screenshots** ([3](#3-the-automatic-screenshot), [4](#4-more-screenshots-whole-page-and-pick-a-part)).
-- **What happened**, the description ([6](#6-the-description-field)).
+- **Enter any feedback:**, the description field ([6](#6-the-description-field)).
 - **Kind** and **Priority** ([7](#7-kind-and-priority)).
 - **File it** and **Cancel**, a one-line key hint (`⌘↵ file · esc close · tab next field · ? all
   shortcuts`), and a folded **Captured with it** section ([12](#12-what-is-captured-with-a-report)).
@@ -119,6 +118,12 @@ picture is a second piece of evidence and one already annotated must not vanish.
 
 ![Pick a part: dragging a rectangle with a mouse](screenshots/09-region-picker.png)
 
+Beside the two buttons, a small **(?)** carries what used to be a paragraph under them: that a
+screenshot is optional (or, once there is one, that the buttons add rather than replace), that both
+use the browser's own screen capture for exact pixels where it can and will ask permission, and that
+clicking a screenshot annotates it while its **×** deletes it. It shows on hover or keyboard focus,
+so the panel stays quiet until someone asks.
+
 With a **mouse**, letting go takes the picture. With a **finger or a pen**, letting go leaves the
 rectangle up with four corner handles (44 px touch targets around a 14 px dot). Drag a corner to
 resize, drag inside to move, draw outside to start again, then press **Use this part** (or Enter).
@@ -169,6 +174,9 @@ Images dropped into the description can be annotated the same way ([6](#6-the-de
 
 The description is a WYSIWYG markdown editor (TipTap with `tiptap-markdown`):
 
+- **A focus ring on the whole field**, not just the textarea, in the theme's accent colour (PLC green,
+  `--fbk-accent`, by default): the border and a soft glow appear the moment the cursor is inside it —
+  rich or markdown, dropped image or typed text — so the eye goes straight to where you type.
 - **Rich** is the default: bold, italic, code, heading, bullet and numbered lists and quote from the
   toolbar or with markdown shortcuts as you type (`**bold**`, `- ` for a list).
 - **Markdown** shows the source, which is exactly what will be stored. While the Markdown tab is
@@ -195,10 +203,10 @@ Both optional, with PL LabOS tools' defaults.
 - **Kind:** bug (default), request, question, chore.
 - **Priority:** P0 Blocking (nobody can work around this), P1 Serious (there is a workaround and it
   hurts), P2 Normal (default; worth doing, not urgent), P3 Someday (a good idea with no clock on it).
-- A line under them repeats what the chosen priority means and says that no date is promised
-  against a priority: how fast anything is fixed depends on how full the queue is, which the issues
-  page shows. (An earlier version promised "fixed in 1–2 days" for P0, which taught people to file
-  everything as P0.)
+  Each meaning is spelled out right in the priority dropdown's own options, so it travels with the
+  choice instead of sitting in a paragraph underneath. No date is promised against a priority: how
+  fast anything is fixed depends on how full the queue is, which the issues page shows. (An earlier
+  version promised "fixed in 1–2 days" for P0, which taught people to file everything as P0.)
 
 In practice almost every report arrives as bug/P2. Triage should not rely on them
 ([TRIAGE.md](TRIAGE.md)).
@@ -374,6 +382,10 @@ a server that does not file answers 403 with a sentence, and the client shows it
   it is never left hidden behind a capture that never returns.
 - **Small reports survive the tab closing mid-send**: bodies under 60 KB are sent with `keepalive`.
 - **A backslash at the end of a line** (a terminal habit for typing a newline) is removed, not filed.
+- **The default theme is PLC green** (`--fbk-accent: #1E8F5E`, a green rail), not PL LabOS tools'
+  clay. Every colour is a `--fbk-*` CSS variable, so a host app re-skins it in its own stylesheet or
+  through `FeedbackProvider`'s `theme` prop — see the client README's
+  [Theming](../packages/feedback-react/README.md#theming) section.
 - **Safari on iPad**: the rail height uses `innerHeight` rather than `100dvh`, IndexedDB opens are
   given 2 s before falling back, and connections are opened per transaction, because Safari drops long
   held ones.
