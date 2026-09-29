@@ -8,7 +8,7 @@
  * GitHub stores do not have this limit.
  */
 import { mkdir, readdir, readFile } from 'node:fs/promises';
-import { isAbsolute, join, normalize, sep } from 'node:path';
+import { isAbsolute, join, normalize, resolve, sep } from 'node:path';
 import { writeAtomic } from '../fsutil.ts';
 import type {
   FeedbackStore, ImageType, Issue, IssueAttachment, IssueDraft, IssueFilter, IssuePatch,
@@ -56,7 +56,7 @@ export interface FileStore extends FeedbackStore {
 
 export function fileStore(options: FileStoreOptions | string): FileStore {
   const opts = typeof options === 'string' ? { dir: options } : options;
-  const root = isAbsolute(opts.dir) ? opts.dir : join(process.cwd(), opts.dir);
+  const root = resolve(opts.dir); // relative to the working directory
   const now = opts.now ?? (() => new Date());
 
   const read = async (): Promise<Array<{ file: string; issue: ParsedIssue }>> => {

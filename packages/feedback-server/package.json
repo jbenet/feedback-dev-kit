@@ -2,42 +2,51 @@
   "name": "@jbenet/feedback-server",
   "version": "0.1.0",
   "description": "Server side of feedback-kit: a journal-first feedback endpoint, a background ingester and issue stores (files, SQLite/Postgres, GitHub Issues).",
-  "type": "module",
   "license": "MIT",
+  "author": "Juan Benet",
+  "type": "module",
   "engines": {
     "node": ">=20"
   },
+  "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
       "default": "./dist/index.js"
     },
     "./next": {
       "types": "./dist/next.d.ts",
+      "import": "./dist/next.js",
       "default": "./dist/next.js"
     },
     "./node": {
       "types": "./dist/node.d.ts",
+      "import": "./dist/node.js",
       "default": "./dist/node.js"
     },
     "./sql": {
       "types": "./dist/stores/sql.d.ts",
+      "import": "./dist/stores/sql.js",
       "default": "./dist/stores/sql.js"
     },
     "./github": {
       "types": "./dist/stores/github.d.ts",
+      "import": "./dist/stores/github.js",
       "default": "./dist/stores/github.js"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
     "src",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsup && tsc -p tsconfig.build.json && node ../../scripts/build-package.mjs fix-dts dist",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --test --test-concurrency=1 test/*.test.ts",
     "prepack": "npm run build"

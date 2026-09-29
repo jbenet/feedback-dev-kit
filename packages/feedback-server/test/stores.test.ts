@@ -10,8 +10,8 @@ import { PNG_B64, id, tempDir } from './helpers.ts';
 
 const png = () => new Uint8Array(Buffer.from(PNG_B64, 'base64'));
 const draft = (overrides: Partial<IssueDraft> = {}): IssueDraft => ({
-  title: 'Totals row double-counts soft commitments', body: 'Invented. See ![chart](attachment:1).',
-  kind: 'bug', priority: 'P2', reporter: 'ada', page: '/pipeline', labels: [], context: { route: '/pipeline' },
+  title: 'Totals row double-counts returned loaves', body: 'Invented. See ![chart](attachment:1).',
+  kind: 'bug', priority: 'P2', reporter: 'ada', page: '/orders', labels: [], context: { route: '/orders' },
   attachments: [{ kind: 'screenshot', contentType: 'image/png', bytes: png() }, { kind: 'image', contentType: 'image/png', bytes: png(), name: 'chart.png' }],
   tokenOffset: 1, clientId: id(), ...overrides,
 });
@@ -58,11 +58,11 @@ test('files store: the Capital OS format, numbering, dedupe, pictures and update
   const store = fileStore(dir);
   await contract(store);
   const names = (await readdir(dir)).filter((n) => n.endsWith('.md')).sort();
-  assert.equal(names[0], '0001-totals-row-double-counts-soft-commitments.md');
+  assert.equal(names[0], '0001-totals-row-double-counts-returned-loaves.md');
   const text = await readFile(join(dir, names[0]!), 'utf8');
-  assert.match(text, /^---\nid: "0001"\ntitle: Totals row double-counts soft commitments\nstatus: triaged {7}# open/);
+  assert.match(text, /^---\nid: "0001"\ntitle: Totals row double-counts returned loaves\nstatus: triaged {7}# open/);
   assert.match(text, /\nclient_id: [0-9a-f-]{36}\n/);
-  assert.match(text, /```json context\n\{\n {2}"route": "\/pipeline"\n\}\n```/);
+  assert.match(text, /```json context\n\{\n {2}"route": "\/orders"\n\}\n```/);
 });
 
 test('frontmatter: unmanaged lines survive a status change; review reads as done; a second rewrite changes nothing', async (t) => {
@@ -96,7 +96,7 @@ async function sqlSuite(t: { after(fn: () => unknown): void }, db: SqlDriver) {
   const store = sqlStore({ db, dir });
   await contract(store);
   // The markdown is written too, in the files format.
-  assert.ok((await readdir(dir)).includes('0001-totals-row-double-counts-soft-commitments.md'));
+  assert.ok((await readdir(dir)).includes('0001-totals-row-double-counts-returned-loaves.md'));
   const fromFile = await store.files.get('0001');
   assert.equal(fromFile?.status, 'triaged');
 

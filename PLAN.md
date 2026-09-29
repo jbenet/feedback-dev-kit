@@ -1,8 +1,7 @@
 # feedback-kit — build plan (shared by the agents building it)
 
-Extracted from Capital OS (PLC Raise Tools), 29 Sep 2026. Source of truth for behaviour:
-/Users/jbenet/git/plc-os/plcos-claude-dev (branch claude/main). Read it; never copy real data
-(plcos-data/real, data/real) — screenshots and examples use the demo profile / invented data only.
+Extracted from Capital OS, 29 Sep 2026; Capital OS's source was the source of truth for behaviour.
+Never copy its data: screenshots, examples and tests use invented data only.
 
 ## Layout
 ```

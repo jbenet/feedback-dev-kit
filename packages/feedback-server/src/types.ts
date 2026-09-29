@@ -25,7 +25,7 @@ export interface FeedbackWireRequest {
   body?: string;
   kind?: IssueKind;
   priority?: IssuePriority;
-  /** The route the report was written on, e.g. `/pipeline`. */
+  /** The route the report was written on, e.g. `/orders`. */
   page?: string;
   /** { route, url, filters, client: { userAgent, viewport, pixelRatio, touch }, … } */
   context?: Record<string, unknown>;

@@ -50,13 +50,13 @@ separate journal process.
 
 ## Development and tests
 
-| Package | Version in Capital OS | Why |
+| Package | Version | Why |
 |---|---|---|
-| `typescript` | 7.0.2 | Types; `tsc --noEmit` in the gate. |
-| `playwright` | 1.63.0 | End-to-end tests and the doc screenshots: Chromium for most checks, WebKit with touch emulation for the region picker. Playwright's WebKit cannot drag with a finger, so touch drags are driven with synthetic `PointerEvent`s; a real iPad remains the final check. |
-| `sharp` | 0.35.4 | Generating invented test images and comparing captures. |
-| `tsx` | 4.23.13 | Running TypeScript scripts and property tests in Node. |
+| `typescript` | 7.0.2 | Types; `tsc --noEmit` in the gate, and the `.d.ts` files in each package's `dist/`. |
+| `tsup` | 8.5.1 | The packages' JavaScript: one ES module per source file, so each keeps its `'use client'`. (Its own `dts` step needs TypeScript's JavaScript API, which TypeScript 7 does not have, so declarations come from `tsc`.) |
+| `@playwright/test` | 1.63 | The example's end-to-end tests in Chromium and WebKit, and the doc screenshots. Playwright's WebKit cannot drag with a finger, so its touch drags are synthetic `PointerEvent`s; a real iPad remains the final check. |
 | `@electric-sql/pglite` | 0.5.8 | Postgres semantics in-process for the SQL store's tests. |
+| Node's test runner | Node ≥ 22.18 | `node --test` runs the TypeScript tests directly (type stripping); the client's capture test uses `mock.module` (`--experimental-test-module-mocks`). |
 
 ## Browser APIs relied on
 

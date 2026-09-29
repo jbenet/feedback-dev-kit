@@ -3,20 +3,39 @@
   "version": "0.1.0",
   "description": "The client of feedback-kit: a feedback button and keyboard shortcut, a sidebar with automatic and region screenshots, a WYSIWYG markdown field, per-page drafts, an offline outbox, and the issues pages. Extracted from Capital OS.",
   "license": "MIT",
+  "author": "Juan Benet",
   "type": "module",
-  "sideEffects": ["*.css"],
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "sideEffects": [
+    "*.css"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./styles.css": "./dist/styles.css",
+    "./source": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
-    "./styles.css": "./src/styles.css"
+    "./source/styles.css": "./src/styles.css",
+    "./package.json": "./package.json"
   },
-  "files": ["src", "README.md"],
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "build": "tsup && tsc -p tsconfig.build.json && node ../../scripts/build-package.mjs fix-dts dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test --experimental-test-module-mocks test/*.test.ts",
+    "prepack": "npm run build"
   },
   "peerDependencies": {
     "react": ">=19",

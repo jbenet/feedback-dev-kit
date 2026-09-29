@@ -1,15 +1,20 @@
 {
   "name": "feedback-kit",
   "private": true,
-  "description": "Capital OS's feedback module, extracted: a React client, a journal-first server, and an example Next.js app.",
+  "description": "An in-app feedback module for React apps: a client package, a journal-first server package, and an example Next.js app.",
   "workspaces": [
     "packages/*",
     "examples/*"
   ],
   "scripts": {
+    "build": "npm run build -w examples/next-app",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm test --workspaces --if-present",
     "dev": "npm run dev -w examples/next-app",
     "e2e": "npm run e2e -w examples/next-app"
-  }
+  },
+  "devDependencies": {
+    "tsup": "^8.5.1"
+  },
+  "license": "MIT"
 }

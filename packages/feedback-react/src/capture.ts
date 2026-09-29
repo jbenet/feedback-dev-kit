@@ -40,10 +40,11 @@ const MAX_WIDTH = 2000;
 const CAPTURE_TIMEOUT_MS = 12_000;
 
 function withTimeout<T>(work: Promise<T>, ms = CAPTURE_TIMEOUT_MS): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
   return Promise.race([
     work.catch(() => null),
-    new Promise<null>((resolve) => { setTimeout(() => resolve(null), ms); }),
-  ]);
+    new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), ms); }),
+  ]).finally(() => clearTimeout(timer));
 }
 
 function toPng(source: CanvasImageSource, w: number, h: number): string {
@@ -215,8 +216,8 @@ async function renderNow(region?: Region): Promise<string | null> {
           if (v === 'auto' || v === 'scroll' || v === 'overlay') el.style.setProperty(prop, 'hidden');
         }
         // A table keeps the height it has on the page, but the filter below leaves out its rows
-        // under the fold, so the rows that remain were stretched to fill it: every row of the
-        // pipeline hundreds of pixels tall (seen on long tables). Let a table and
+        // under the fold, so the rows that remain were stretched to fill it: every row of a
+        // long table hundreds of pixels tall. Let a table and
         // its row groups take the height of what is drawn.
         if (['TABLE', 'TBODY', 'THEAD', 'TFOOT', 'TR'].includes(el.tagName)) {
           el.style.removeProperty('height');

@@ -1,6 +1,6 @@
 # @jbenet/feedback-react
 
-The client half of feedback-kit: Capital OS's feedback box, for any React 19 app.
+The client half of feedback-kit: the feedback box from Capital OS, for any React 19 app.
 
 - **A button and a shortcut.** `Alt+F` (Option+F on a Mac) anywhere outside text fields and dialogs.
 - **A sidebar** that opens straight into typing. No title field — the server writes the title.
@@ -28,13 +28,21 @@ The server half is `@jbenet/feedback-server` (packages/feedback-server). The wir
 npm install @jbenet/feedback-react
 ```
 
-Peer dependencies: `react` and `react-dom` 19. The package ships TypeScript source; in Next.js add
-it to `transpilePackages`:
+Peer dependencies: `react` and `react-dom` 19. The package ships ES modules in `dist/` (one file
+per source module, so each keeps its `'use client'` directive, and a server component can import
+`VIEWPORT_BOOT` as a plain string) with type declarations, plus the stylesheet at
+`@jbenet/feedback-react/styles.css`. No bundler configuration is needed.
+
+It also ships its TypeScript source. To compile it with your app instead (to step through it, or to
+patch it), import from `@jbenet/feedback-react/source` and `@jbenet/feedback-react/source/styles.css`,
+and in Next.js add it to `transpilePackages`:
 
 ```ts
 // next.config.ts
 export default { transpilePackages: ['@jbenet/feedback-react'] };
 ```
+
+Use one or the other throughout: the two entry points are separate module instances.
 
 Self-host the fonts (same origin), or the automatic screenshot draws text in fallback fonts:
 
@@ -87,7 +95,9 @@ import { IssuesPage, IssuePage } from '@jbenet/feedback-react';
 <IssuePage id={id} editable />     // fetches GET /api/issues/:id; the status control PATCHes it
 ```
 
-`examples/next-app` wires all of it, with the server package, and has end-to-end tests.
+`examples/next-app` wires all of it, with the server package, and has end-to-end tests (Chromium and
+WebKit). `npm test` here runs the capture fallbacks with the browser stubbed; what cannot be tested
+headless is in [REBUILD.md §15](../../docs/REBUILD.md#15-what-cannot-be-tested-headless).
 
 ## Configuration — `<FeedbackProvider>`
 
@@ -116,7 +126,7 @@ Every prop is optional; without a provider the defaults apply.
 |---|---|
 | `FeedbackButton` | `variant="rail" \| "bar" \| "floating"`. The launcher, the shortcut, and the outbox's start. Mount one per page. |
 | `FeedbackDrawer` | The box itself, if you want to open it yourself. |
-| `FeedbackStatus` | The status line (`variant="rail" \| "bar"`); a click opens `OutboxList` (Retry now, Copy text, Discard). |
+| `FeedbackStatus` | The status line (`variant="rail" \| "bar"`): a glyph and "1 report only on this device", "Saved on server · filing…" or "Filed as issue 0024"; nothing when there is nothing to say. A click opens `OutboxList` (Retry now, Copy text, Discard). |
 | `KeyboardShortcuts` | The `?` dialog listing every key. |
 | `IssuesPage`, `IssuePage`, `IssueList`, `IssueDetail`, `IssueVelocity` | The issues pages and their parts. `Link` prop takes your router's link. |
 | `MarkdownField`, `Markdown` | The editor and the renderer, on their own. |
@@ -151,7 +161,10 @@ the brand colour.
 - Endpoints, shortcut, storage names, user label, links and theme are configuration, not imports.
 - The drawer traps Tab and opens with the cursor in the description; draft words load before the
   first render, so keys typed the instant it opens are kept.
-- The issues list adds search, a Fixed-in column and a status control; the annotation toolbar is
-  icon buttons with tooltips.
+- The issues list adds search (`/` focuses it), a Fixed-in column and a status control; the
+  annotation toolbar is one row of icon buttons with names and tooltips.
+- The automatic capture's "Mis-aligned?" hint is a **Misaligned? Tell us** toggle, recorded with the
+  report as `context.capture.misaligned`.
+- The status mark is a line in words that opens the outbox list directly (no popover in between).
 - Capital OS's "filed from the live app" notice for development servers and its connection notes
   are not part of the kit.

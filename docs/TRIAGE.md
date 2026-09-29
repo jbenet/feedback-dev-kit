@@ -46,7 +46,7 @@ Three were planned; the real issues showed a fourth, data corrections.
 | Class | Test | Examples |
 |---|---|---|
 | **A. No-brainer** | Broken against its own spec, or copy, small UX (order, alignment, show or hide, scroll, a default), or performance. No change to what a record means. No new page. | a capture drawn 8 px off; a draft losing its pictures; a button under the fold on iPad; a slow page |
-| **B. Data correction** | A first-person fact about a record: "I know them", "is on our team", "these are duplicates", "wrong type". Evidence, not code. | "these two firms are the same" |
+| **B. Data correction** | A first-person fact about a record: "I know them", "is on our team", "these are duplicates", "wrong type". Evidence, not code. | "these two customers are the same" |
 | **C. Contradiction** | Reverses or conflicts with a recorded decision: design boards, the project's invariants, a dated decision by the owner, an earlier triage or closing note. | a request to change a default the owner chose; a navigation order he set |
 | **D. Big change** | A model (scoring, routing, confidence, identity); a new page or a redesign; data semantics (statuses, types, what counts); anything touching confidentiality, access, connectors or outward actions (sending, money); a destructive migration. | a new scoring model; a new workflow page |
 
@@ -63,10 +63,10 @@ The classifier is conservative:
 
 ## 3. Roles → outcomes
 
-Who filed it decides what an agent may do without asking. Capital OS's roles are admin, GP (a general
-partner: a full user) and viewer; the owner is the admin who makes product decisions.
+Who filed it decides what an agent may do without asking. Capital OS has three roles: admin, member
+(a full user) and viewer; the owner is the admin who makes product decisions.
 
-| | Owner / admin | GP / team member | Viewer | Agent-filed (a monitor, a test) |
+| | Owner / admin | Member | Viewer | Agent-filed (a monitor, a test) |
 |---|---|---|---|---|
 | **A** | Build it. | Build it. If it changes a page everyone uses, put it behind a flag for a day. | Build it. | Build it, inside that agent's own permissions. |
 | **B** | Apply as a reviewed fact, "on the owner's word". | Record as the reporter's evidence. | Record as evidence, lower weight. | Evidence at the agent's confidence. |
@@ -79,8 +79,8 @@ Always, whatever the class or role:
   is built: who can see what, any new place data goes, anything that sends, pays or publishes.
 - A reporter the server could not verify is treated as a team member, not the owner.
 
-In short: **admin feedback can be auto-built; GP and viewer feedback that goes beyond a no-brainer is
-specced first; confidentiality always goes to the owner.**
+In short: **admin feedback can be auto-built; member and viewer feedback that goes beyond a no-brainer
+is specced first; confidentiality always goes to the owner.**
 
 ## 4. Classifying: evidence, not memory
 
@@ -176,7 +176,7 @@ model: sonnet
 ---
 You fix one issue in <app> inside your own git worktree.
 
-1. Read the issue file you are given, and the rules in AGENTS.md and docs/agent-rules/frontend.md.
+1. Read the issue file you are given, and the project's rules (AGENTS.md or its equivalent).
 2. Start a demo server on a free port from 3110–3119: `PORT=3110 npm run dev`. Invented data only.
 3. Reproduce the problem, fix it, and check it with Playwright at the issue's viewport. Look at your own
    screenshots; don't send them back.

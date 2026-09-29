@@ -109,7 +109,8 @@ export function createIngester(options: IngesterOptions): Ingester {
         clearTimeout(timer);
       }
     }
-    title ||= titleFrom(entry.request.body) || 'Untitled';
+    // The first sentence; else the first line with a letter in it (an image's name, say); else "Untitled".
+    title ||= titleFrom(entry.request.body) || sanitizeTitle(entry.request.body.replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')) || 'Untitled';
     titles.set(entry.clientId, title);
     return title;
   }

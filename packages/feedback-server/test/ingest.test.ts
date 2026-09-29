@@ -12,7 +12,7 @@ import { PNG, id, silent, tempDir, wire } from './helpers.ts';
 async function journalWith(journal: Journal, n: number, overrides: Record<string, unknown> = {}) {
   const ids: string[] = [];
   for (let i = 0; i < n; i += 1) {
-    const r = checkReport(wire({ body: `Invented report number ${i + 1} about the pipeline.`, ...overrides }));
+    const r = checkReport(wire({ body: `Invented report number ${i + 1} about the orders page.`, ...overrides }));
     assert.ok(r.ok);
     const clientId = id();
     await journal.write({ clientId, reporter: 'ada', report: r.value });
@@ -172,14 +172,14 @@ test('titles: generated once and kept across retries, sanitized, and the first s
   const { store, drafts } = flaky(inner, () => (fail ? new Error('invented') : null));
   const ingester = createIngester({
     journal, store, backoff: () => 0, logger: silent,
-    generateTitle: async (input) => { generated += 1; return `"Totals row double-counts soft commitments on ${input.page}."\nextra line`; },
+    generateTitle: async (input) => { generated += 1; return `"Totals row double-counts returned loaves on ${input.page}."\nextra line`; },
   });
   await journalWith(journal, 1);
   await ingester.runOnce();
   fail = false;
   await ingester.runOnce();
   assert.equal(generated, 1);
-  assert.equal(drafts.at(-1)!.title, 'Totals row double-counts soft commitments on /pipeline');
+  assert.equal(drafts.at(-1)!.title, 'Totals row double-counts returned loaves on /orders');
 
   const throwing = createIngester({ journal, store: inner, logger: silent, generateTitle: async () => { throw new Error('model down'); } });
   await journalWith(journal, 1, { body: 'Export button does nothing. Clicked it twice on the invented page.' });
@@ -203,6 +203,18 @@ test('titles: generated once and kept across retries, sanitized, and the first s
   await given.runOnce();
   assert.equal(asked, false);
   assert.equal((await inner.get('0004'))?.title, 'Agent-filed: nightly import failed');
+
+  // No sentence to take (journaled by other means than the route, which refuses a report with no
+  // words): the first line with a letter in it, an image's name included, and only then "Untitled".
+  const bare = createIngester({ journal, store: inner, logger: silent, generateTitle: null });
+  const base = checkReport(wire());
+  assert.ok(base.ok);
+  await journal.write({ clientId: id(), reporter: 'ada', report: { ...base.value, body: '![oven-temperatures.png](attachment:1)' } });
+  await bare.runOnce();
+  assert.equal((await inner.get('0005'))?.title, 'oven-temperatures.png');
+  await journal.write({ clientId: id(), reporter: 'ada', report: { ...base.value, body: '---' } });
+  await bare.runOnce();
+  assert.equal((await inner.get('0006'))?.title, 'Untitled');
 });
 
 test('one pass at a time: a kick during a pass runs one more; startIngester is once per journal', async (t) => {

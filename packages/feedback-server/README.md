@@ -112,13 +112,13 @@ The server also accepts `client_id`, an optional `title` (from agents filing thr
 |---|---|---|
 | `journal` | required | A `Journal` or its folder. |
 | `store` | none | Needed for the issue reads, PATCH and the export. |
-| `resolveReporter(req)` | none | Returns the reporter's handle or id from your session. A throw counts as null, so a report is never lost to a session lookup. |
+| `resolveReporter(req)` | none | Returns the reporter's handle or id from your session (a cookie, a header your auth proxy sets; nothing that waits on a database). **Supply it**: without it every issue is filed as `unknown`. A throw counts as null, so a report is never lost to a session lookup. |
 | `origin` | same origin | `{ allowed: ['https://app.example'], allowMissing }`, or `false` for non-browser clients behind other auth. Compares against the `Host` header. `X-Forwarded-Host` is never trusted. |
 | `limits` | see `DEFAULT_LIMITS` | 48 MB request, 12 M base64 characters per picture, 40 M for all pictures, 20 pictures, 60,000 body characters, 64 KB context. Every value is a GUESS. |
 | `rateLimit` | `{ perMinute: 30 }` | New reports per reporter, in memory. Anonymous senders are keyed by `x-real-ip` / `x-forwarded-for`, which a client can set, so put a real limit in your proxy. |
 | `accept` | `true` | `false` (or a function) answers 403 with `refusalMessage`. Use this on every server that must not file: only one server may hand out numbers. |
 | `exportToken` | `$FEEDBACK_EXPORT_TOKEN` | |
-| `authorize(req, action)` | allow all | `action` is `'read'`, `'update'` or `'attachment'`. Return false (403) or your own Response. Issues can hold anything a reporter saw, so put them behind your auth. |
+| `authorize(req, action)` | allow all | `action` is `'read'`, `'update'` or `'attachment'`. Return true, false (403) or your own Response (a 401, say). Issues can hold anything a reporter saw: **supply this**, as you supply `resolveReporter`, or every issue and picture is readable by anyone who can reach the server. The example's is a demo "sign in as" cookie, which is not authentication. |
 | `onJournaled(clientId)` | kick the ingester | |
 
 ### `startIngester(options)` / `createIngester(options)`
@@ -130,7 +130,7 @@ The server also accepts `client_id`, an optional `title` (from agents filing thr
 | Option | Default | |
 |---|---|---|
 | `journal`, `store` | required | |
-| `generateTitle` | Claude if `ANTHROPIC_API_KEY` is set | `(input, signal) => Promise<string | null>`. `null` turns it off. The first sentence (80 characters at most) is the fallback. |
+| `generateTitle` | Claude if `FEEDBACK_TITLE_API_KEY` or `ANTHROPIC_API_KEY` is set | `(input, signal) => Promise<string \| null>`. `null` turns it off. The fallback is the first sentence (80 characters at most); failing that, the first line with a letter in it (an image's name); failing that, "Untitled". |
 | `titleTimeoutMs` | 15 s | |
 | `identify(selector, entry)` | none | Resolves the captured reporter off the request, for example with a database lookup. Throw on a failed lookup: the entry stays journaled and is retried. Return null only when the lookup worked and found nobody; the issue is then filed as `unknown`. |
 | `everyMs` | 10 s | Passes also run at start-up and after each journal write. |
@@ -145,8 +145,8 @@ import { anthropicTitle } from '@jbenet/feedback-server';
 startIngester({ journal, store, generateTitle: anthropicTitle({ model: 'claude-haiku-4-5' }) });
 ```
 
-- Environment: `ANTHROPIC_API_KEY` (or `FEEDBACK_TITLE_API_KEY`), and `FEEDBACK_TITLE_MODEL` (default
-  `claude-haiku-4-5`; `claude-sonnet-5` works too).
+- Environment: `FEEDBACK_TITLE_API_KEY` (read first) or `ANTHROPIC_API_KEY`, and `FEEDBACK_TITLE_MODEL`
+  (default `claude-haiku-4-5`).
 - It sends the body, the page, the kind and the first screenshot. Turn the screenshot off with
   `includeScreenshot: false` or `FEEDBACK_TITLE_SCREENSHOT=0`.
 - **All of that leaves your server.** Leave the key unset when reports may hold data that must not go to
@@ -274,6 +274,23 @@ confidential data.
   report that waited in the journal.
 - **Filing.** The record goes to `filed/` first, then the entry is removed. A crash between the two
   makes the next pass file again, and the store answers with the issue it already has.
+
+## Environment variables
+
+| Variable | Read by | |
+|---|---|---|
+| `FEEDBACK_EXPORT_TOKEN` | `createFeedbackHandler` | Enables `GET /api/feedback/export` with this bearer token. Unset: 404. |
+| `FEEDBACK_TITLE_API_KEY`, then `ANTHROPIC_API_KEY` | `anthropicTitle`, the default `generateTitle` | Titles by Claude. Unset: no model is called. |
+| `FEEDBACK_TITLE_MODEL` | `anthropicTitle` | Default `claude-haiku-4-5`. |
+| `FEEDBACK_TITLE_SCREENSHOT` | `anthropicTitle` | `0` keeps the screenshot out of the title request. |
+| `FEEDBACK_GITHUB_TOKEN`, then `GITHUB_TOKEN` | `githubStore` | The token for the issues repository. |
+
+(`FEEDBACK_DATA` belongs to the example app, not the package: the folder it journals and files into.)
+
+## Build
+
+`npm run build` writes `dist/`: one ES module per source file (tsup) and its declarations (tsc). The
+package's exports point there; `src/` ships too, for reading and source maps. Node 20 or later.
 
 ## Tests
 

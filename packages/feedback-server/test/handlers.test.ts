@@ -42,7 +42,7 @@ test('POST journals a report, answers 202 with the client id, and a resend is a 
   const st = await status.json();
   assert.equal(st.state, 'filed');
   assert.equal(st.id, '0001');
-  assert.match(st.location, /^0001-the-totals-row-on-the-invented-pipeline-page-cou\.md$/);
+  assert.match(st.location, /^0001-the-totals-row-on-the-invented-orders-page-count\.md$/);
 });
 
 test('the reporter comes from the session, never from the body, and server-only context keys are dropped', async (t) => {

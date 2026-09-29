@@ -9,10 +9,10 @@ test('the fallback title is the first sentence, cut at a clause, never over 80 c
   assert.equal(titleFrom('```\n![shot](attachment:1)\n- the [rail](http://x) is *hard* to read'), 'The rail is hard to read');
   assert.equal(titleFrom('\\\n  \n'), '');
   assert.equal(titleFrom('Short. Then more.'), 'Short. Then more');
-  const long = 'The pipeline totals row on the invented page counts soft commitments, which makes the headline number wrong for everyone';
+  const long = 'The orders totals row on the invented page counts returned loaves, which makes the headline number wrong for everyone';
   const t = titleFrom(long);
   assert.ok(t.length <= 80, t);
-  assert.equal(t, 'The pipeline totals row on the invented page counts soft commitments');
+  assert.equal(t, 'The orders totals row on the invented page counts returned loaves');
   const words = titleFrom('a'.repeat(30) + ' ' + 'b'.repeat(30) + ' ' + 'c'.repeat(30));
   assert.ok(words.length <= 80 && words.endsWith('…'), words);
   assert.equal(continuations('one \\\ntwo\\'), 'one\ntwo');
@@ -32,24 +32,24 @@ test('anthropicTitle sends the body, page and first screenshot to the configured
     messages: {
       async create(body, options) {
         calls.push({ body, options });
-        return { content: [{ type: 'text', text: 'Totals row double-counts soft commitments' }], stop_reason: 'end_turn' };
+        return { content: [{ type: 'text', text: 'Totals row double-counts returned loaves' }], stop_reason: 'end_turn' };
       },
     },
   };
   const generate = anthropicTitle({ client, model: 'claude-haiku-4-5' });
   const ac = new AbortController();
   const title = await generate({
-    clientId: 'x', body: 'Invented body.', page: '/pipeline', kind: 'bug', priority: 'P2', context: {},
+    clientId: 'x', body: 'Invented body.', page: '/orders', kind: 'bug', priority: 'P2', context: {},
     attachments: [{ kind: 'screenshot', contentType: 'image/png', bytes: Buffer.from(PNG_B64, 'base64') }],
   }, ac.signal);
-  assert.equal(title, 'Totals row double-counts soft commitments');
+  assert.equal(title, 'Totals row double-counts returned loaves');
   const { body, options } = calls[0]!;
   assert.equal(body.model, 'claude-haiku-4-5');
   assert.equal(options?.signal, ac.signal);
   const content = (body.messages as Array<{ content: Array<{ type: string; source?: { data: string }; text?: string }> }>)[0]!.content;
   assert.equal(content[0]!.type, 'image');
   assert.equal(content[0]!.source!.data, PNG_B64);
-  assert.match(content[1]!.text!, /Page: \/pipeline/);
+  assert.match(content[1]!.text!, /Page: \/orders/);
   assert.match(content[1]!.text!, /Invented body\./);
 
   const noShots = anthropicTitle({ client, includeScreenshot: false });

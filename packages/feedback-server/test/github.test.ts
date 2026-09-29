@@ -83,8 +83,8 @@ function fakeGitHub(opts: { assetsPrivate?: boolean } = {}) {
 }
 
 const draft = (overrides: Partial<IssueDraft> = {}): IssueDraft => ({
-  title: 'Totals row double-counts soft commitments', body: 'Invented. Kept: ![chart](attachment:1)',
-  kind: 'bug', priority: 'P2', reporter: 'ada', page: '/pipeline', labels: [], context: { route: '/pipeline' },
+  title: 'Totals row double-counts returned loaves', body: 'Invented. Kept: ![chart](attachment:1)',
+  kind: 'bug', priority: 'P2', reporter: 'ada', page: '/orders', labels: [], context: { route: '/orders' },
   attachments: [
     { kind: 'screenshot', contentType: 'image/png', bytes: png() },
     { kind: 'image', contentType: 'image/png', bytes: png(), name: 'chart.png' },

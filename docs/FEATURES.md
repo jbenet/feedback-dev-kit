@@ -1,12 +1,13 @@
 # Features
 
-A tour of the feedback module as it runs in Capital OS, and what the kit keeps, drops or adds.
-Every screenshot was taken from the Capital OS demo server (invented data) at 2× in Chromium.
+A tour of the feedback module: what it does, what it keeps from Capital OS (where it was built), and
+what the kit adds. Every screenshot was taken from `examples/next-app`, an invented bakery with
+invented people, at 2× in Chromium, by `examples/next-app/scripts/screenshots.mjs`.
 
-One change applies throughout: **the kit has no Title field.** Capital OS asked for an optional
-title. The kit never asks. A title is generated on the server from the body, the page and the
+One change from Capital OS applies throughout: **there is no Title field.** Capital OS asked for an
+optional title. The kit never asks. A title is generated on the server from the body, the page and the
 screenshots, by an LLM when one is configured, and otherwise from the first sentence of the body
-(see [SERVER.md](SERVER.md#6-titles)). Screenshots that still show the Title field are marked.
+(see [SERVER.md](SERVER.md#6-titles)).
 
 Contents:
 
@@ -34,9 +35,10 @@ Contents:
 
 ![The Feedback button in the rail's footer, with the Option+F hint shown while the shortcuts list is open](screenshots/01-button.png)
 
-- **Feedback** sits in the footer of the navigation rail, beside the settings gear, on every page.
-  It is also rendered in the fallback layout used when the server is too busy to draw navigation,
-  so a report can be filed exactly when things are going wrong.
+- **Feedback** (`FeedbackButton`) sits wherever the app puts it; in the example, in the footer of the
+  navigation rail on every page, above the status line and the demo's "Signed in as". Put it in any
+  fallback layout too (Capital OS draws one when the server is too busy to draw navigation), so a
+  report can be filed exactly when things are going wrong.
 - **Alt+F** (Option+F on a Mac) opens it from anywhere. The match is on the physical key
   (`event.code === 'KeyF'`), because on macOS Option+F types `ƒ`. The shortcut does nothing while
   the focus is in a text field, during IME composition, on key repeat, or when another dialog is
@@ -44,13 +46,12 @@ Contents:
 - The button carries `aria-keyshortcuts="Alt+F"`. The small `Option+F` hint inside it is hidden
   normally and appears only while the app's keyboard-shortcuts list is open, so the rail stays
   quiet.
-- The kit makes the shortcut configurable (`shortcut` in the client config).
+- The shortcut is configurable (`shortcut` on `FeedbackProvider`), and `openFeedback()` opens the box
+  from any control of the app's own.
 
 ## 2. The feedback panel
 
-![The feedback panel open over the Today page](screenshots/02-drawer.png)
-
-*Capital OS original; the kit has no title.*
+![The feedback panel open over the Orders page](screenshots/02-drawer.png)
 
 The panel is a drawer on the right, 420 px wide, over a dimmed scrim. On a phone it takes the
 full width. From top to bottom:
@@ -72,15 +73,13 @@ remembered in this browser only (localStorage).
 
 ![The wide layout: screenshots left, text right](screenshots/03-wide.png)
 
-*Capital OS original; the kit has no title.*
-
 The drawer and everything it opens are portalled to `<body>`, so a sticky rail's stacking context
 cannot paint over them. Every part of it carries the class `nocapture`, which keeps it out of its own
 screenshot.
 
 ## 3. The automatic screenshot
 
-![The screenshots column: one automatic capture, labelled "Drawn from the page", with Mis-aligned?](screenshots/04-screenshots.png)
+![The screenshots column: one automatic capture, labelled "Drawn from the page", with Misaligned? Tell us](screenshots/04-screenshots.png)
 
 When the panel opens, it takes a screenshot of the current viewport by itself: no button, no
 permission prompt. It is a **redraw**: the page's DOM cloned into an SVG `foreignObject` and
@@ -93,10 +92,14 @@ dropped, so the picture shows the page as it was before the panel covered it.
   of pixels (anti-aliasing), at the top of a page and scrolled. Getting there took self-hosted
   fonts, a zeroed body margin, sticky and fixed elements moved back to where they are on screen,
   and no phantom scrollbars ([REBUILD.md](REBUILD.md#5-the-capture-pipeline)).
-- **Ask people to say when it is wrong.** Next to every automatic capture is a dotted
-  **Mis-aligned?** link. Its tooltip says the capture is a redraw that can get spacing, wrapping or a
-  form control subtly wrong, and that **Whole page** or **Pick a part** take the exact pixels
-  instead. A misalignment report is a bug in the capture, and should be filed as one.
+- **Ask people to say when it is wrong** (the kit's version of Capital OS's "Mis-aligned?" hint).
+  Under every automatic capture is a dotted **Misaligned? Tell us** toggle. Its tooltip says the
+  capture is a redraw that can get spacing, wrapping or a form control subtly wrong, and that
+  **Whole page** or **Pick a part** take the exact pixels instead. Pressing it marks the screenshot
+  (it reads **Misaligned · noted**), thanks the reporter, and records the flag with the report
+  (`context.capture.misaligned`), so a bad capture arrives as evidence about the capture.
+
+![Misaligned? Tell us, under an automatic capture](screenshots/22-misaligned.png)
 - If the redraw fails or takes more than 12 s, nothing is added and nothing is said: it was never
   asked for. The report files without a screenshot.
 - Each screenshot has **✎ Annotate** and **×** (delete) in its top-right corner. Clicking the
@@ -138,9 +141,7 @@ unsupported, or it took too long. Everything else still files."
 
 ## 5. Annotating a screenshot
 
-![The annotation editor with a box and an arrow](screenshots/11-annotate.png)
-
-*Capital OS original; the panel behind the editor still shows the Title field, which the kit does not have.*
+![The annotation editor with a box and an arrow, and the Undo tooltip](screenshots/11-annotate.png)
 
 **Annotate** opens a full-screen editor over the picture:
 
@@ -151,6 +152,12 @@ unsupported, or it took too long. Everything else still files."
   corner to set a wrap width, double-click to retype. Size is in pixels of the saved image, 8–400,
   typed or picked from presets. Bold on by default.
 - Undo (⌘Z), Redo (⌘⇧Z or ⌘Y), Clear, Cancel and Done. A status line counts the marks.
+- **The toolbar is one row of icon buttons** (a kit change; Capital OS used words). Each has an
+  accessible name and a tooltip with its shortcut, shown on hover and keyboard focus; the active tool
+  is marked as well as announced (`aria-pressed`). On a phone the row fits the screen with 44 px
+  targets.
+
+![The annotation toolbar with the Undo tooltip showing](screenshots/21-toolbar-tooltip.png)
 - **The annotated image replaces the original**; the original is not kept. The screenshot is then
   flagged **annotated**.
 
@@ -183,7 +190,7 @@ The description is a WYSIWYG markdown editor (TipTap with `tiptap-markdown`):
 
 ## 7. Kind and priority
 
-*In Capital OS; the kit keeps both, optional, with the same defaults.*
+Both optional, with Capital OS's defaults.
 
 - **Kind:** bug (default), request, question, chore.
 - **Priority:** P0 Blocking (nobody can work around this), P1 Serious (there is a workaround and it
@@ -199,8 +206,6 @@ In practice almost every report arrives as bug/P2. Triage should not rely on the
 ## 8. Drafts
 
 ![A restored draft: "Your unsent draft for this page, kept in this browser since…"](screenshots/12-draft-restored.png)
-
-*Capital OS original; the kit has no title.*
 
 Nothing typed is lost to a reload, a crash or a closed tab.
 
@@ -260,25 +265,25 @@ changes, so two open tabs show the same outbox.
 Only when neither the browser nor the server could keep it does the panel stay open, with "Not
 saved", the reason, and the draft intact.
 
-## 10. The status mark
+## 10. The status line
 
-![The status mark beside the user and its popover: Filed as issue 0024](screenshots/14-status.png)
+![The status line in the rail, "Filed as issue 0007", and the list it opens](screenshots/14-status.png)
 
-A single small mark beside the user's name in the rail says where filed feedback stands, most urgent
-first:
+`FeedbackStatus` is a small line in the rail (or a bar) that says where filed feedback stands, most
+urgent first, in a glyph and words:
 
-| Mark | Meaning |
-|---|---|
-| `!` solid | Feedback only on this device: not yet safe to close the tab. |
-| `◌` pulsing | Saving now. |
-| `✓` | Saved on the server, or just filed. |
-| `·` | Nothing to say. |
+| Glyph | Words | Meaning |
+|---|---|---|
+| `!` | "1 report only on this device" | Not yet safe to close the tab. `×` when the server refused one. |
+| `↑` | "Saving…" | Sending now. |
+| `✓` | "Saved on server · filing…" | Safe on the server; the issue is being filed. |
+| `✓` | "Filed as issue 0024" | Filed (shown for a few seconds). |
+| — | — | Nothing to say: the line is not drawn. |
 
-A tap (not a hover, for touch screens) opens the words: "1 note only on this device", "Saved on
-server · filing…", "Filed as issue 0024", with **Show the notes** for the outbox list. Colour is never
-the only signal; the glyph and the words differ, and urgent states are announced through an
-`aria-live` region. In Capital OS the same mark also reports background imports; the kit's mark
-covers feedback only and can host an app's own states.
+A click or tap (not a hover, for touch screens) opens the outbox list. Colour is never the only
+signal; the glyph and the words differ, and changes are announced (`aria-live="polite"`). Capital OS
+used a single mark with a popover in between, and its mark also reported background imports; the
+kit's line covers feedback only.
 
 ## 11. Keyboard
 
@@ -295,8 +300,6 @@ covers feedback only and can host an app's own states.
 
 ![The panel's keys card](screenshots/05-keys.png)
 
-*Capital OS original; the kit has no title.*
-
 ## 12. What is captured with a report
 
 ![Captured with it: the route, URL, filters and device](screenshots/06-context.png)
@@ -310,7 +313,7 @@ reproduced on the device it was seen on. It is sent as `context` and written int
 
 ![The issues list with status, priority and kind filters](screenshots/16-issues.png)
 
-In Capital OS, **Developer → Issues** lists every issue:
+`IssuesPage` lists every issue (in Capital OS, **Developer → Issues**):
 
 - Four counts at the top: open issues at P0, P1, P2 and P3, each with what it means.
 - An **issue velocity** chart: filed and closed per day for the last 30 days, and the open count,
@@ -320,16 +323,20 @@ In Capital OS, **Developer → Issues** lists every issue:
   runs in the browser.
 - Columns: id, title (with reporter and page under it), kind, priority, status, fixed in (links to
   the changelog entry), and filed (relative time).
-- A sidebar says what each priority means and where issues are stored.
-
 **The kit adds**, beyond Capital OS:
 
 - **Local search.** A search box (focused with `/`) that filters as you type over id, title, body,
   reporter, page and labels, from an index built once in the browser. No request per keystroke. Search
-  combines with the chip filters.
+  combines with the chip filters, and the header counts what it hid.
+
+![Search: "harbor" typed after pressing /, two issues shown](screenshots/19-search.png)
+
 - **Status changes from the page.** Capital OS edits status in the issue file; the kit adds a status
-  control on the issue page (open, triaged, agent-ready, in-progress, done) that writes through the
-  store, keeps unmanaged fields, and records `closed_at` when an issue is closed.
+  control on the issue page (open, triaged, agent-ready, in-progress, done) that PATCHes the store,
+  keeps unmanaged fields, and records `closed_at` when an issue is closed. The server's `authorize`
+  hook decides who may; the example lets any signed-in demo user.
+
+![The issue sidebar with the status control set to agent-ready](screenshots/20-status-control.png)
 
 ## 14. The issue page
 
@@ -346,9 +353,11 @@ In Capital OS, **Developer → Issues** lists every issue:
 ## 15. Reporter identity
 
 The reporter is never taken from the request body. The server captures the session's user when the
-report arrives and resolves it to a known user before the issue is written. If the lookup fails, the
+report arrives (the app's `resolveReporter(req)`) and can resolve it to a known user before the issue is
+written (the ingester's `identify`). If the lookup fails, the
 report waits in the journal and is retried; `unknown` is written only when a successful lookup finds no
-user. The issue's context records whether the reporter was verified.
+user. The issue's context records how the reporter was established. In the example, a report filed
+while signed out is filed as `unknown`; reading issues needs a sign-in.
 
 ## 16. Servers that must not file
 

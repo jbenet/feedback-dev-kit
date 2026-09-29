@@ -3,6 +3,19 @@ node_modules/
 dist/
 *.tsbuildinfo
 next-env.d.ts
-examples/next-app/.data/
 test-results/
 playwright-report/
+
+# Feedback data. Journals, filed issues and their screenshots hold whatever was on a reporter's
+# screen: never commit them. (The example writes to FEEDBACK_DATA, default examples/next-app/.data/.)
+.data/
+inbox/
+journal/
+feedback-data/
+/data/
+/issues/
+
+# Secrets
+.env
+.env.*
+!.env.example

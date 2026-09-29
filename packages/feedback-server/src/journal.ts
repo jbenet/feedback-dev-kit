@@ -252,16 +252,19 @@ export function createJournal(dir: string, options: JournalOptions = {}): Journa
       const cutoff = Date.now() - olderThanMs;
       const old = async (p: string) => { try { return (await stat(p)).mtimeMs < cutoff; } catch { return false; } };
       // Temporaries a crash left behind.
-      for (const d of [dir, filedDir, refusedDir]) {
+      const temporaries = async (d: string) => {
         let names: string[] = [];
-        try { names = await readdir(d); } catch { continue; }
+        try { names = await readdir(d); } catch { return; }
         for (const n of names) {
           if (n.startsWith('.') && n.endsWith('.tmp') && await old(join(d, n))) {
             await rm(join(d, n), { force: true });
             removed += 1;
           }
         }
-      }
+      };
+      await temporaries(dir);
+      await temporaries(filedDir);
+      await temporaries(refusedDir);
       // Picture folders no pending entry names: a crash before the commit, or a lost race.
       let folders: string[] = [];
       try { folders = await readdir(filesDir); } catch { folders = []; }

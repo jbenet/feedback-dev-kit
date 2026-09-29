@@ -4,13 +4,13 @@ import type { NextConfig } from 'next';
 const repo = join(__dirname, '..', '..');
 
 const config: NextConfig = {
-  // The client package ships TypeScript source; Next compiles it with the app.
-  transpilePackages: ['@jbenet/feedback-react'],
-  // The server package is imported from ../../packages (see lib/feedback.ts), outside this folder.
+  // Both packages are npm workspaces linked from ../../packages (built to dist/ by `npm run build`),
+  // so the project root is the repository's.
   turbopack: { root: repo },
   outputFileTracingRoot: repo,
-  // The ingester's optional model call is loaded only when configured; never bundle it.
-  serverExternalPackages: ['@anthropic-ai/sdk', 'better-sqlite3', 'pg'],
+  // The server package is plain Node ESM (node:fs, dynamic imports of optional peers): load it
+  // from node_modules at run time rather than bundling it, and never bundle its optional peers.
+  serverExternalPackages: ['@jbenet/feedback-server', '@anthropic-ai/sdk', 'better-sqlite3', 'pg'],
   devIndicators: false,
 };
 

@@ -25,14 +25,15 @@ Contents:
 12. [The issues pages](#12-the-issues-pages)
 13. [Accessibility, theming and layout](#13-accessibility-theming-and-layout)
 14. [Acceptance tests](#14-acceptance-tests)
+15. [What cannot be tested headless](#15-what-cannot-be-tested-headless)
 
 ---
 
 ## 1. Architecture
 
 ```
- FeedbackButton ──opens──▶ FeedbackPanel ─────────────────────────────┐
-   (Alt+F)                  ├ ScreenshotList ─▶ capture (redraw | screen) ─▶ RegionPicker
+ FeedbackButton ──opens──▶ FeedbackDrawer ────────────────────────────┐
+   (Alt+F)                  ├ screenshots ─▶ capture (redraw | screen) ─▶ RegionPicker
                             │                 └▶ ShotEditor (annotate)
                             ├ MarkdownField (TipTap) ─▶ dropped images ─▶ ShotEditor
                             ├ kind, priority
@@ -42,7 +43,7 @@ Contents:
                               POST /api/feedback  ──202──▶ server journal (disk) ─▶ ingester ─▶ store
                                           │                                          (files, SQL, GitHub)
                               GET /api/feedback?clientId=  ◀── "filed as 0024"
- StatusMark ◀── outbox state (useSyncExternalStore) ──▶ OutboxList (Retry now, Copy text, Discard)
+ FeedbackStatus ◀── outbox state (useSyncExternalStore) ──▶ OutboxList (Retry now, Copy text, Discard)
  IssuesPage, IssuePage ◀── GET /api/issues, /api/issues/:id, /api/issues/attachments/<path>
 ```
 
@@ -73,12 +74,13 @@ interface FeedbackRequest {
   body: string;              // markdown; images as ![name](attachment:N)
   kind?: 'bug' | 'request' | 'question' | 'chore';        // default bug
   priority?: 'P0' | 'P1' | 'P2' | 'P3';                   // default P2
-  page: string;              // the route when filed, e.g. "/pipeline"
+  page: string;              // the route when filed, e.g. "/orders"
   context: {
     route: string;           // same as page
     url: string;             // location.href
     filters: Record<string, string>;   // Object.fromEntries(new URLSearchParams(location.search))
     startedOn?: string;      // the draft's page, when it differs from page
+    capture?: { misaligned: number[] };  // screenshots (1-based) the reporter flagged "Misaligned? Tell us"
     client: { userAgent: string; viewport: string /* "1440×900" */; pixelRatio: number; touch: boolean };
   };
   screenshots: string[];     // PNG data URLs, in list order
@@ -112,21 +114,36 @@ Acceptance is only a 2xx that says it journaled (or filed) **and echoes this ent
 
 ### 2.3 GET `{base}/api/feedback?clientId=…`
 
-Reads the journal only (never the database). `{ state: 'journaled' }`, `{ state: 'filed', id }`,
-`{ state: 'refused', error }`, or 404 `{ state: 'unknown' }`.
+Reads the journal only (never the database). `{ state: 'journaled' }`, `{ state: 'filed', id, location }`
+(`location`: the issue's file name or URL), `{ state: 'refused', error }`, or 404 `{ state: 'unknown' }`.
+
+The POST can also answer **422** `{ error, clientId, state: 'refused' }` (this client id was refused for
+good) and **429** `{ error, clientId }` with `retry-after` (the per-reporter rate limit). By §2.2 the first
+is refused and the second retried on the clock.
 
 ### 2.4 Reads for the issues pages
 
-`GET {base}/api/issues` → `{ issues: Issue[] }`; `GET {base}/api/issues/:id` → `{ issue }`;
-`GET {base}/api/issues/attachments/<path>` → image bytes; `PATCH {base}/api/issues/:id`
-`{ status?, priority?, labels? }` → `{ issue }`. Shapes in [§12](#12-the-issues-pages) and SERVER.md.
+`GET {base}/api/issues` → `{ issues: Issue[], destination, store }`; `GET {base}/api/issues/:id` →
+`{ issue }`; `GET {base}/api/issues/attachments/<path>` → image bytes; `PATCH {base}/api/issues/:id`
+`{ status?, priority?, kind?, labels? }` → `{ issue }` (same-origin only). The client reads `issues`
+(or `items`, or a bare array). Every one of these goes through the server's `authorize(req, action)`
+hook; an app must supply it, or its issues are readable by anyone who can reach it. Shapes in
+[§12](#12-the-issues-pages) and SERVER.md.
 
 ## 3. Components
 
+The names below are the kit's exports from `@jbenet/feedback-react`: `FeedbackButton`, `FeedbackDrawer`
+(the panel), `FeedbackStatus` and `OutboxList` (the status mark and the outbox), `KeyboardShortcuts`,
+`RegionPicker`, `ShotEditor`, `MarkdownField`, `Markdown`, and `IssuesPage`, `IssuePage`, `IssueList`,
+`IssueDetail`, `IssueVelocity`. Configuration (endpoints, shortcut, storage prefix, theme, user label)
+comes from an optional `FeedbackProvider`; see the package README.
+
 ### 3.1 `FeedbackButton`
 
-- Renders a button labelled "Feedback" (a pencil glyph `✎` in the rail variant), `title="Give feedback"`,
-  `aria-keyshortcuts="Alt+F"`, and a hint span (`Option+F` on Apple platforms, `Alt+F` elsewhere)
+- `variant="rail" | "bar" | "floating"`. Renders a button labelled "Feedback" (a pencil glyph `✎` in the
+  rail variant, "Give feedback" otherwise), `title="Give feedback (Alt+F)"`,
+  `aria-keyshortcuts="Alt+F"` (both follow the configured shortcut), and a hint span `.feedbackkey`
+  (`Option+F` on Apple platforms, `Alt+F` elsewhere)
   hidden by default and shown when the global shortcuts dialog is open
   (`body:has(.shortcuts-dialog[open]) .feedbackkey { display: inline }`).
 - Starts the outbox sender on mount (`startOutbox()`), so a report kept by an earlier page is sent
@@ -136,7 +153,7 @@ Reads the journal only (never the database). `{ state: 'journaled' }`, `{ state:
 - Platform detection for labels: `/Mac|iPad|iPhone|iPod/i.test(navigator.platform)`, evaluated after
   mount (SSR renders the non-Apple label, then corrects).
 
-### 3.2 `FeedbackPanel`
+### 3.2 `FeedbackDrawer` (the panel)
 
 A `role="dialog" aria-label="Give feedback"` drawer, portalled to `document.body` after mount, over a
 scrim. Both carry `nocapture`. Clicking the scrim closes the panel (the draft is kept).
@@ -154,7 +171,7 @@ picking: boolean         // region picker up: same
 failed: boolean          // last explicit capture returned nothing
 editingShot: string | null; editingImage: number | null
 imagesPending: boolean   // the markdown field is still reading files
-wide: boolean            // localStorage "<prefix>.feedback.wide" === "1"
+wide: boolean            // localStorage "<prefix>.feedback.wide" === "1" (prefix default "feedbackkit")
 showKeys: boolean; showDrafts: boolean
 generation: number       // bumped per loaded draft; used as the MarkdownField's React key
 ```
@@ -167,14 +184,15 @@ and one sentence, screenshots column (list, Whole page, Pick a part, hint, failu
 
 **File it** is disabled while `body.trim() === ''`, while saving, and while `imagesPending`.
 
-### 3.3 `ScreenshotList`
+### 3.3 The screenshots column (inside `FeedbackDrawer`)
 
 Each thumbnail: a button containing the image (`max-height: 190px; object-fit: cover; object-position:
 top`) that opens the annotator, an overlay bar with **✎ Annotate** and **×**
 (`aria-label="Remove screenshot N"`), and a meta row: the method label (`Drawn from the page` /
-`Captured from your screen`), an `annotated` flag, and, for `render` shots only, a focusable
-**Mis-aligned?** element (`tabIndex=0`) whose `title` explains the redraw and points to the exact
-buttons. Under the buttons: "Optional — the complaint files without one." when empty, else "Adds
+`Captured from your screen`), an `annotated` flag, and, for `render` shots only, a
+**Misaligned? Tell us** toggle button (`aria-pressed`; it reads "Misaligned · noted" when on) whose
+`title` explains the redraw and points to the exact buttons. The flagged screenshots' numbers go in
+`context.capture.misaligned`, and a line thanks the reporter and says Whole page gives exact pixels. Under the buttons: "Optional — the complaint files without one." when empty, else "Adds
 another; it does not replace what is already here." plus "Both buttons use your browser's screen
 capture for exact pixels, and it will ask permission."
 
@@ -189,14 +207,15 @@ panel an `attachment:N` resolves to the local data URL; on the issue page `attac
 the attachment endpoint. An image that cannot be resolved renders "image not attached: name". External
 links open in a new tab with `rel="noreferrer"`.
 
-### 3.8 `StatusMark` and `OutboxList`
+### 3.8 `FeedbackStatus` and `OutboxList`
 
-`StatusMark` is a small button beside the user (`aria-haspopup="dialog"`, `aria-expanded`,
-`aria-label="Status: <summary>"`), plus a visually hidden `aria-live="polite"` span that carries the
-summary only in urgent tones. A tap opens a popover (`role="dialog" aria-label="Status"`), anchored above
-the mark, with the summary, one sentence, and **Show the notes**, which opens `OutboxList`
-(`role="dialog" aria-label="Feedback waiting to file"`). Both close on Esc and on a scrim click.
-[§10.6](#106-what-the-status-mark-says) gives the words.
+`FeedbackStatus` (`variant="rail" | "bar"`) is a small button (`.obchip`, `aria-live="polite"`,
+`title="Where your feedback stands"`) showing a glyph and the summary in words; it renders nothing when
+there is nothing to say. A click (not a hover, for touch screens) opens `OutboxList`
+(`role="dialog" aria-label="Feedback waiting to file"`), anchored above the chip, with each waiting
+report and **Retry now**, **Copy text** and **Discard**. It closes on Esc and on a scrim click.
+[§10.6](#106-what-the-status-mark-says) gives the words. (Capital OS put a popover with **Show the
+notes** between the mark and the list; the kit opens the list directly.)
 
 ### 3.9 `KeyboardShortcuts`
 
@@ -357,7 +376,7 @@ out), fall back to the redraw.
 - **Cross-origin images** cannot be inlined without CORS; they render blank. Serve app images from the
   same origin or with `Access-Control-Allow-Origin`, and accept blanks otherwise.
 - **iframes** are not drawn by the redraw (their documents are not cloned). Use the screen capture for
-  pages that matter inside iframes, and say so in the Mis-aligned tooltip if the host app embeds them.
+  pages that matter inside iframes, and say so in the Misaligned tooltip if the host app embeds them.
 - **Canvas and video** content is copied as a frame where the library can read it; a tainted
   (cross-origin) canvas cannot be read.
 - **Safari.** `getDisplayMedia` is not available on iPadOS/iOS Safari: the buttons fall back to the
@@ -367,8 +386,9 @@ out), fall back to the redraw.
 
 ### 5.5 What to tell users
 
-Keep the **Mis-aligned?** affordance on every redraw. A mismatch is a capture bug; ask for it to be filed
-with a **Whole page** capture beside the automatic one, which gives the two pictures to compare.
+Keep the **Misaligned? Tell us** toggle on every redraw. A mismatch is a capture bug; the flag travels
+with the report (`context.capture.misaligned`), and a **Whole page** capture beside the automatic one
+gives the two pictures to compare.
 
 ## 6. The region picker
 
@@ -501,7 +521,7 @@ any, "N in the text — only those are sent."
 
 ## 9. Drafts
 
-Storage (prefix configurable, default `feedback`):
+Storage (prefix configurable with `storagePrefix`, default `feedbackkit`):
 
 | What | Where | Key |
 |---|---|---|
@@ -595,16 +615,14 @@ Compute from the state, most urgent first. `device` = entries except the one `ju
 
 | Condition | Label | Short | Tone | Glyph |
 |---|---|---|---|---|
-| `device.length > 0` | "N notes only on this device" (+ " · R refused", + " · S on the server") | "N on this device" | device, or refused if any refused | `!` solid |
-| an entry is being saved | "Saving…" | "Saving…" | send | pulsing ring |
+| `device.length > 0` | "1 report only on this device", "N reports only on this device" (+ " · R refused", + " · S on the server") | "N on this device" | device, or refused if any refused | `!` (refused: `×`) |
+| an entry is being saved | "Saving…" | "Saving…" | send | `↑` |
 | `onServer.length > 0` | "Saved on server · filing…" / "N saved on server · filing…" | "On the server" | server | `✓` |
-| last filed has `error` | "Not filed: error" | "Not filed" | refused | `!` |
+| last filed has `error` | "Not filed: error" | "Not filed" | refused | `×` |
 | last filed | "Filed as issue 0024" | "Filed 0024" | done | `✓` |
-| nothing | — | — | idle | none |
+| nothing | — | — | — | the chip is not drawn |
 
-One sentence under it: unsafe → "Kept only in this browser until the server accepts it: keep this
-browser open, it resends on its own."; saving → "Sending now."; otherwise "Saved on the server: safe to
-close this tab." The pulsing animation stops under `prefers-reduced-motion`.
+This is `outboxSummary(state)` in the kit; `label` is shown in the rail variant, `short` in the bar.
 
 ## 11. Keyboard
 
@@ -698,7 +716,7 @@ Kit addition: a status `<select>` that PATCHes and shows the saved state; the se
 
 ## 13. Accessibility, theming and layout
 
-- Every dialog has a role and a label: the panel, the region picker, the keys card, the status popover,
+- Every dialog has a role and a label: the panel, the region picker, the keys card,
   the outbox list, the shortcuts dialog.
 - **Focus.** On open, focus the description. Trap Tab and Shift+Tab inside the panel (wrap from last to
   first and back; when focus is outside, go to the first or last), skipping elements with no client rects
@@ -713,13 +731,19 @@ Kit addition: a status `<select>` that PATCHes and shows the saved state; the se
 - Touch targets: 44 px for handles and picker buttons on coarse pointers; 36 px for outbox actions on
   phones.
 - Respect `prefers-reduced-motion`.
-- **Theme** through CSS variables so an app can re-skin: `--surface`, `--ground`, `--ink`, `--muted`,
-  `--line`, `--hair`, `--accent`, `--accent-wash`, `--clay` (errors), `--green` (saved), `--amber`
-  (Mis-aligned), `--mono`, `--display`, and for the rail `--rail-ink`, `--rail-text`, `--rail-line`,
-  `--rail-edge`, `--rail-soft`. The default values are Capital OS's.
+- **Theme** through CSS variables so an app can re-skin. The kit declares them on `:where(.fbk)` (no
+  specificity), `.fbk` being the class on every root it draws: `--fbk-ground`, `--fbk-surface`,
+  `--fbk-ink`, `--fbk-muted`, `--fbk-line`, `--fbk-hair`, `--fbk-tint`, `--fbk-label`, `--fbk-accent`,
+  `--fbk-accent-ink`, `--fbk-accent-soft`, `--fbk-accent-line`, `--fbk-accent-wash`, `--fbk-accent-halo`,
+  `--fbk-clay` (errors, refusals), `--fbk-green` (saved), `--fbk-purple`, `--fbk-amber` (Misaligned),
+  `--fbk-display`, `--fbk-sans`, `--fbk-mono`, `--fbk-drawer-w`, and for the rail `--fbk-rail`,
+  `--fbk-rail-ink`, `--fbk-rail-muted`, `--fbk-rail-text`, `--fbk-rail-line`, `--fbk-rail-edge`,
+  `--fbk-rail-soft`, `--fbk-rail-raise`, `--fbk-rail-hover`, `--fbk-rail-dim`, `--fbk-rail-av`. Override
+  them in CSS (`.fbk { --fbk-accent: … }`) or with the provider's `theme` prop. The default values are
+  Capital OS's.
 - **Layout.** Drawer 420 px, `position: fixed; top/right/bottom: 0`, scrim `rgba(26,25,23,.28)`; phone
   (≤ 760 px) full width with safe-area padding. The keys card sits to the left of the drawer
-  (`right: calc(var(--drawer-w, 420px) + 26px)`), top-right on narrow screens. Use `innerHeight` (set a
+  (`right: calc(var(--fbk-drawer-w, 420px) + 26px)`), top-right on narrow screens. Use `innerHeight` (set a
   `--app-h` variable before first paint) rather than `100dvh` on iPad Safari, and skip the update while
   pinch-zoomed (`visualViewport.scale > 1.01`).
 - **`nocapture`**: document it for host apps. Anything with that class is left out of the automatic
@@ -727,8 +751,9 @@ Kit addition: a status `<select>` that PATCHes and shows the saved state; the se
 
 ## 14. Acceptance tests
 
-Run in Playwright (Chromium; WebKit where noted) against the example app, and as Node property tests for
-the pure modules. Invented data only.
+Run in Playwright against the example app, and as Node tests for the pure modules. Invented data
+only. The kit's suite (`npm run e2e`) runs every end-to-end test in both **Chromium and WebKit**; §15
+lists what the kit automates today and what it cannot automate headless.
 
 **Opening and keyboard**
 
@@ -779,7 +804,7 @@ the pure modules. Invented data only.
 
 17. File with the server up: the panel closes in under 300 ms; the status mark shows "Saved on server ·
     filing…" then "Filed as issue N" within 15 s; exactly one issue exists.
-18. File with `/api/feedback` blocked: the mark shows `!` and "1 note only on this device"; reload the
+18. File with `/api/feedback` blocked: the mark shows `!` and "1 report only on this device"; reload the
     page: still there; unblock: it files once, without user action, within the backoff window or at once on
     the next successful request.
 19. Freeze the server (SIGSTOP) for 60 s during a file: it files exactly once after SIGCONT.
@@ -806,3 +831,38 @@ the pure modules. Invented data only.
 31. `packAttachments` keeps referenced images in first-reference order and rewrites tokens consistently.
 32. Keyboard predicates: Option+F (`key: 'ƒ'`, `code: 'KeyF'`) matches; Alt+Shift+F, Ctrl+Alt+F and
     typing targets do not.
+
+## 15. What cannot be tested headless
+
+The kit's automated checks, as shipped:
+
+- **End to end** (`examples/next-app/e2e`, Playwright, Chromium and WebKit): Alt+F opens the box with
+  the cursor in the description, no title field on any page, markdown typed as markdown, a dropped
+  file, a region picked with the mouse (1, 3, 9, 11 and 12 in part); a region drawn and adjusted with a
+  finger (10); filing with ⌘/Ctrl+Enter, journaled then "Filed as issue N" (17); a draft through a
+  reload and Drafts · 1 (15); the outbox through a reload and replayed when the server is back (18);
+  the list, search with `/`, the detail page's pictures and a status change (25–27 in part); the
+  annotation toolbar on a phone (icon buttons with names and tooltips, a box drawn with a finger);
+  and the example's sign-in guard on the issue reads and PATCH.
+- **Unit** (`npm test`): the capture fallbacks with the browser stubbed (8): no `getDisplayMedia`, a
+  declined prompt, a window shared instead of the tab, and both methods failing. On the server, the
+  journal, ingester, stores, titles, adapters and handlers (20 and the server side of 17–22).
+
+Not automated, because a headless browser cannot do it:
+
+- **The exact screen capture.** `getDisplayMedia` needs a person to choose a tab in the browser's own
+  prompt. Chromium can be told to auto-accept, but then it shares a fake or whole-screen source, so the
+  frame, its size and the crop of a region are never the real ones. The unit tests cover the decisions
+  around the frame (fallback, mismatch), not its pixels. Check **Whole page** and **Pick a part** by
+  hand in Chrome, Edge and desktop Safari after touching `capture.ts`.
+- **Real Safari.** Playwright's WebKit is WebKit, not Safari: it does not have iPadOS Safari's
+  `100dvh`, visual-viewport and pinch behaviour, its dropped IndexedDB connections, its absent
+  `getDisplayMedia`, its gesture events, or real touch input (the WebKit touch tests dispatch
+  `PointerEvent`s with `pointerType: 'touch'`; Chromium's use real touch through the DevTools
+  protocol). Test on a real iPad and a Mac before a release; Safari-only reports cannot be reproduced
+  here.
+- **Redraw fidelity** (6). The pixel comparison against `page.screenshot()` is not in the suite; the
+  0.05% figure was measured in Capital OS.
+
+Not automated yet, though they could be: 2, 4, 13 (comparing bytes), 14, 16, 19 (SIGSTOP), 21–24, and
+the client-side properties 28–32.

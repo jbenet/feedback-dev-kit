@@ -39,6 +39,36 @@ async function dropImage(page: Page, name: string) {
 /** The rail's status line. */
 const status = (page: Page) => page.locator('.obchip');
 
+type TouchType = 'touchStart' | 'touchMove' | 'touchEnd';
+
+/**
+ * A finger on the screen. Chromium gets real touch input through the DevTools protocol. WebKit has
+ * no such protocol in Playwright, so there the same gesture is dispatched as touch pointer events,
+ * kept on the element the finger went down on (as a browser captures a touch pointer implicitly).
+ */
+async function finger(page: Page, browserName: string): Promise<(type: TouchType, x: number, y: number) => Promise<unknown>> {
+  if (browserName === 'chromium') {
+    const cdp = await page.context().newCDPSession(page);
+    return (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y, id: 1 }] });
+  }
+  return (type, x, y) => page.evaluate(([t, px, py]) => {
+    const w = window as unknown as { __fingerOn?: Element | null };
+    const name = { touchStart: 'pointerdown', touchMove: 'pointermove', touchEnd: 'pointerup' }[t];
+    const target = t === 'touchStart' || !w.__fingerOn ? document.elementFromPoint(px, py) : w.__fingerOn;
+    if (t === 'touchStart') w.__fingerOn = target;
+    target?.dispatchEvent(new PointerEvent(name, {
+      bubbles: true, cancelable: true, composed: true, pointerId: 7, pointerType: 'touch', isPrimary: true,
+      clientX: px, clientY: py, button: 0, buttons: t === 'touchEnd' ? 0 : 1, width: 20, height: 20, pressure: t === 'touchEnd' ? 0 : 0.5,
+    }));
+    if (t === 'touchEnd') w.__fingerOn = null;
+  }, [type, x, y] as const);
+}
+
+// The example's stand-in for auth: signed in as an invented user (lib/users.ts), unless a test signs out.
+test.beforeEach(async ({ context, baseURL }) => {
+  await context.addCookies([{ name: 'demo_user', value: 'robin', url: baseURL! }]);
+});
+
 test('files a report end to end: shortcut, markdown, dropped file, region shot, journaled, listed', async ({ page }) => {
   await page.goto('/reports?region=harbor');
   const box = await openWithShortcut(page);
@@ -120,7 +150,7 @@ test('files a report end to end: shortcut, markdown, dropped file, region shot, 
 test.describe('on a touch screen', () => {
   test.use({ hasTouch: true });
 
-  test('a region is drawn with a finger, adjusted by a corner, and used', async ({ page }) => {
+  test('a region is drawn with a finger, adjusted by a corner, and used', async ({ page, browserName }) => {
     await page.goto('/');
     await page.getByRole('button', { name: /Feedback/ }).tap();
     const box = page.getByRole('dialog', { name: 'Give feedback' });
@@ -130,10 +160,8 @@ test.describe('on a touch screen', () => {
     const picker = page.getByRole('dialog', { name: 'Drag to choose a part of the page' });
     await expect(picker).toBeVisible();
 
-    // Real touch input through the DevTools protocol: pointerType is "touch".
-    const cdp = await page.context().newCDPSession(page);
-    const touch = async (type: 'touchStart' | 'touchMove' | 'touchEnd', x: number, y: number) =>
-      cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y, id: 1 }] });
+    // pointerType is "touch" (see finger()).
+    const touch = await finger(page, browserName);
     await touch('touchStart', 200, 150);
     for (let i = 1; i <= 8; i += 1) await touch('touchMove', 200 + i * 40, 150 + i * 25);
     await touch('touchEnd', 520, 350);
@@ -231,7 +259,7 @@ test('the box never asks for a title, on any page', async ({ page }) => {
 test.describe('annotating on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
-  test('the annotation toolbar is one row of icon buttons with names, and a box drawn is kept', async ({ page }) => {
+  test('the annotation toolbar is one row of icon buttons with names, and a box drawn is kept', async ({ page, browserName }) => {
     await page.goto('/');
     await page.getByRole('button', { name: /Feedback/ }).tap();
     const box = page.getByRole('dialog', { name: 'Give feedback' });
@@ -265,9 +293,7 @@ test.describe('annotating on a phone', () => {
     // Draw a box with a finger, and keep it.
     const canvas = page.locator('.setcanvas');
     const c = (await canvas.boundingBox())!;
-    const cdp = await page.context().newCDPSession(page);
-    const touch = async (type: 'touchStart' | 'touchMove' | 'touchEnd', x: number, y: number) =>
-      cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y, id: 1 }] });
+    const touch = await finger(page, browserName);
     await touch('touchStart', c.x + 20, c.y + 20);
     for (let i = 1; i <= 6; i += 1) await touch('touchMove', c.x + 20 + i * 15, c.y + 20 + i * 8);
     await touch('touchEnd', c.x + 110, c.y + 68);
@@ -276,4 +302,34 @@ test.describe('annotating on a phone', () => {
     await expect(bar).toBeHidden();
     await expect(box.locator('.shotmeta')).toContainText('annotated');
   });
+});
+
+test('signed out, the issues and their pictures are closed; a report still files', async ({ page, context, baseURL }) => {
+  await context.clearCookies();
+  const origin = new URL(baseURL!).origin;
+
+  // The read API, the pictures and status changes answer 401 without the demo session.
+  expect((await page.request.get('/api/issues')).status()).toBe(401);
+  expect((await page.request.get('/api/issues/0001')).status()).toBe(401);
+  expect((await page.request.get('/api/issues/attachments/0001-screenshot.png')).status()).toBe(401);
+  const patch = await page.request.patch('/api/issues/0001', { data: { status: 'done' }, headers: { origin } });
+  expect(patch.status()).toBe(401);
+
+  // The issues page says how to get in.
+  await page.goto('/issues');
+  await expect(page.getByRole('status')).toContainText('Sign in to see issues');
+  await expect(page.getByRole('searchbox', { name: 'Search issues' })).toHaveCount(0);
+
+  // Filing does not need a session: the report is kept, filed as "unknown".
+  const box = await openWithShortcut(page);
+  await page.keyboard.type('Signed out, the rail shows no user name');
+  const posted = page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/feedback');
+  await page.keyboard.press('ControlOrMeta+Enter');
+  expect((await posted).status()).toBe(202);
+  await expect(box).toBeHidden();
+
+  // Sign in as someone from the rail, and the list is there.
+  await page.getByLabel('Sign in as').selectOption('sam');
+  await expect(page.getByRole('searchbox', { name: 'Search issues' })).toBeVisible();
+  await expect(page.getByLabel('Signed in as')).toHaveValue('sam');
 });

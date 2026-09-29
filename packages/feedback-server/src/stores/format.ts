@@ -8,12 +8,12 @@
  *
  *   ---
  *   id: "0007"
- *   title: Export button does nothing on the pipeline page
+ *   title: Export button does nothing on the orders page
  *   status: open          # open | triaged | agent-ready | in-progress | done
  *   kind: bug             # bug | request | question | chore
  *   priority: P2          # P0 blocking | P1 serious | P2 normal | P3 someday
  *   reporter: ada
- *   page: /pipeline
+ *   page: /orders
  *   created: 2026-09-29T10:00:00Z
  *   labels: []
  *   screenshots: [attachments/0007-screenshot.png]

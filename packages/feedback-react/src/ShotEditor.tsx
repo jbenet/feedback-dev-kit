@@ -460,7 +460,8 @@ export function ShotEditor({
       setEditingId(id);
       return;
     }
-    (e.target as Element).setPointerCapture(e.pointerId);
+    // A pointer the browser already let go of cannot be captured; the stroke still starts.
+    try { (e.target as Element).setPointerCapture(e.pointerId); } catch { /* already released */ }
     if (tool === 'pen') setDrawing({ tool: 'pen', colour, width: width(), points: [p] });
     else setDrawing({ tool, colour, width: width(), from: p, to: p });
   };
@@ -731,7 +732,7 @@ export function ShotEditor({
                     setActiveId(l.id);
                     const p = at(e);
                     dragRef.current = { id: l.id, mode: 'move', ox: p[0] - l.at[0], oy: p[1] - l.at[1] };
-                    (e.target as Element).setPointerCapture(e.pointerId);
+                    try { (e.target as Element).setPointerCapture(e.pointerId); } catch { /* already released */ }
                   }}
                   /* The label captures the pointer when a drag starts, so the moves arrive
                      here rather than on the canvas underneath. */
@@ -782,7 +783,7 @@ export function ShotEditor({
                         const body = e.currentTarget.parentElement?.querySelector<HTMLElement>('.setbody');
                         const h = body ? body.getBoundingClientRect().height / scale : l.height;
                         dragRef.current = { id: l.id, mode: 'size', ox: p[0] - l.width, oy: p[1] - h };
-                        e.currentTarget.setPointerCapture(e.pointerId);
+                        try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* already released */ }
                       }}
                     />
                   )}

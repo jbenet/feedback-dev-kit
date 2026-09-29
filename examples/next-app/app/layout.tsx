@@ -28,7 +28,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: VIEWPORT_BOOT }} />
       </head>
       <body>
-        <Providers userLabel={user.name}>
+        <Providers userLabel={user?.name}>
           <div className="app">
             <nav className="rail" aria-label="Main">
               <div className="brand"><span className="mark">O</span><b>Orchard Street</b></div>
@@ -36,7 +36,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
               <div className="railfoot">
                 <FeedbackStatus />
                 <FeedbackButton variant="rail" />
-                <UserSwitcher current={user.handle} />
+                <UserSwitcher current={user?.handle ?? null} />
               </div>
             </nav>
             <main className="main">{children}</main>

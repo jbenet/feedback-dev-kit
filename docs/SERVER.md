@@ -51,13 +51,13 @@ Request (JSON; see [REBUILD.md §2.1](REBUILD.md#21-post-baseapifeedback) for ev
 ```json
 {
   "clientId": "3f0a2c9e-6b1d-4b8e-9d2e-0c1f5a7b8e21",
-  "body": "The totals row counts soft commitments.\n\n![invented-chart.png](attachment:1)",
+  "body": "The Late tile counts an order that is still proofing.\n\n![late-tile.png](attachment:1)",
   "kind": "bug",
   "priority": "P2",
-  "page": "/pipeline",
+  "page": "/orders",
   "context": {
-    "route": "/pipeline", "url": "https://app.example/pipeline?stage=committed",
-    "filters": { "stage": "committed" },
+    "route": "/orders", "url": "https://app.example/orders?state=late",
+    "filters": { "state": "late" },
     "client": { "userAgent": "…", "viewport": "1440×900", "pixelRatio": 2, "touch": false }
   },
   "screenshots": ["data:image/png;base64,…"],
@@ -78,8 +78,13 @@ Responses:
 | 202 | `{ "journaled": true, "clientId": "…", "repeat": true, "id": "0024" }` | A resend of a report already journaled (`id` present once filed). |
 | 400 | `{ "error": "…" }` | Not JSON, malformed client id, no words, wrong image type. |
 | 403 | `{ "error": "…" }` | Origin not allowed, or this server does not file ([§10](#10-security)). |
-| 413 | `{ "error": "…" }` | A picture over 12 MB of base64, or all pictures over 40 MB. |
+| 413 | `{ "error": "…" }` | The request, one picture (over 12,000,000 base64 characters), all pictures (over 40,000,000), more than 20 pictures, the body or the context is too large. |
+| 422 | `{ "error": "…", "clientId": "…", "state": "refused" }` | This client id was refused for good earlier (the ingester set it aside in `refused/`); resending it cannot help. |
+| 429 | `{ "error": "Too many reports in a minute. …", "clientId": "…" }`, `retry-after: 60` | Over the per-reporter rate limit ([§10](#10-security)). A resend of a client id the journal already knows is never limited. |
 | 500 | `{ "error": "The server could not save it: … It is still in your browser and will be sent again." }` | The disk write failed. |
+
+The browser's outbox treats 422 like any other 4xx (kept, marked refused, waits for Retry now) and 429
+like a 5xx (retried on its clock).
 
 A missing client id (an old client) gets one generated; a malformed one is refused, never replaced,
 because it names a file.
@@ -105,9 +110,12 @@ Reads the journal only; answers even while the database is busy.
 
 ```json
 { "state": "journaled" }
-{ "state": "filed", "id": "0024" }
+{ "state": "filed", "id": "0024", "location": "0024-the-late-tile-counts-an-order-that-is-still-proofing.md" }
 { "state": "refused", "error": "…" }
 ```
+
+`location` is where the store put the issue: a file name relative to the issues folder, or a URL (the
+GitHub store's `html_url`).
 
 404 `{ "state": "unknown" }` when the id was never seen.
 
@@ -115,12 +123,20 @@ Reads the journal only; answers even while the database is busy.
 
 | Route | Returns |
 |---|---|
-| `GET /api/issues` | `{ issues: Issue[] }`, newest first. Optional `status`, `kind`, `priority` (comma lists) and `q` (case-insensitive substring over title, body, reporter and page). The issues page loads everything once and filters locally. |
+| `GET /api/issues` | `{ issues: Issue[], destination: string, store: string }`, newest first. `destination` is the store's sentence saying where issues go; `store` its kind (`files`, `sql`, `github`). Optional `status`, `kind`, `priority` (comma lists) and `q` (case-insensitive substring over id, title, body, reporter and page). The issues page loads everything once and filters locally. |
 | `GET /api/issues/:id` | `{ issue: Issue }` or 404. |
-| `PATCH /api/issues/:id` | Body `{ status?, priority?, labels? }` → `{ issue }`. Sets `closed_at` when status becomes `done`, clears it on reopen, keeps unmanaged frontmatter lines. Guard it with the host's own authorisation: only people who triage should change status. |
+| `PATCH /api/issues/:id` | Body `{ status?, priority?, kind?, labels? }` → `{ issue }`. Same-origin only (the Origin check of §10). Sets `closed_at` when status becomes `done`, clears it on reopen, keeps unmanaged frontmatter lines. Guard it with the host's own authorisation (`authorize`, below): only people who triage should change status. |
 | `GET /api/issues/attachments/<path>` | The image bytes with its content type and `cache-control: no-store`. The path is normalised and re-rooted under the store; `..`, NUL and non-image extensions are 404. |
 
-`Issue` is defined in [REBUILD.md §12.1](REBUILD.md#121-data).
+`Issue` is defined in [REBUILD.md §12.1](REBUILD.md#121-data). The same reads are also served under
+`/api/feedback/issues…` and `/api/feedback/attachments/…`, so one catch-all route can carry everything.
+
+**Who may read and change issues.** The handler takes an `authorize(req, action)` hook, called for
+`action` `'read'` (list and detail), `'attachment'` (pictures) and `'update'` (PATCH). It returns `true`,
+`false` (403) or a `Response` of its own (say, a 401). **Without it, every issue read is open to anyone
+who can reach the server**, so a real app must supply one from its session, as it must supply
+`resolveReporter`. The export endpoint is separate: it takes a bearer token ([§9](#9-the-export-endpoint)).
+`examples/next-app` shows both hooks with a demo "sign in as" cookie, which is not authentication.
 
 ### 2.4 `GET /api/feedback/export?since=…` — see [§9](#9-the-export-endpoint).
 
@@ -167,7 +183,7 @@ A journal entry:
   "receivedAt": "2026-09-29T20:02:28.947Z",
   "reporter": "u_17",
   "request": {
-    "title": "", "body": "…", "kind": "bug", "priority": "P2", "page": "/pipeline",
+    "title": "", "body": "…", "kind": "bug", "priority": "P2", "page": "/orders",
     "context": { "…": "…" }, "imageOffset": 1,
     "attachments": [
       { "kind": "screenshot", "contentType": "image/png", "file": "files/3f0a…/1-screenshot.png", "bytes": 182311, "sha256": "…" }
@@ -237,14 +253,20 @@ The client never asks for a title. The ingester makes one:
    stop, no quotes, no invented detail. Time-box it (GUESS: 15 s) and treat any failure as "no title".
    The title is generated once, at filing, and stored; it is not regenerated when the body is edited.
    Anything sent to a model leaves your server: see [§10](#10-security).
-2. **The fallback**, always available, from the body:
+2. **The fallback**, always available, from the body (`titleFrom` in `title.ts`):
    - Take the first line that contains a letter or digit, skipping code fences and image lines, with
      list markers, `>` and `#` stripped. Remove image syntax, keep link text, drop `*_\``, collapse
      spaces.
    - Take its first sentence if that sentence is at least 12 characters. Strip trailing punctuation.
    - Over 80 characters: drop parenthetical asides; still over, cut at the last clause boundary
      (`, `, `; `, ` — `, `: `) if it is at least 32 characters in, else at a word boundary with `…`.
-   - Capitalise the first letter. If nothing is left, the title is "Untitled" (the report still files).
+   - Capitalise the first letter.
+3. **The first line.** When that finds nothing (a body that is only an image, say), the first line
+   with a letter or digit in it, image syntax reduced to its alt text, cleaned like a model's title
+   (one line, no markdown, at most 80 characters): `![late-tile.png](attachment:1)` is titled
+   `late-tile.png`. Only when even that is empty is the title "Untitled". The route refuses a report
+   whose body has no words unless it carries a title, so steps 3 and "Untitled" are reached only by
+   entries journaled some other way; the report still files.
 
 A title a sender typed (API callers) is kept as given, joined onto one line.
 
@@ -269,7 +291,7 @@ interface FeedbackStore {
 |---|---|---|---|
 | **Files** | `NNNN-slug.md` per issue ([§8](#8-the-issue-file-format)) | next integer, zero-padded to 4, in a lock | `attachments/NNNN-screenshot.png` beside the issues |
 | **Files + SQL** (SQLite or Postgres) | the file, plus a row per issue for querying | same | files |
-| **Files + GitHub** | a GitHub issue, plus a local mirror file named by the GitHub number | GitHub's | see [§11.3](#113-screenshots) |
+| **Files + GitHub** | a GitHub issue, plus a local mirror file named by the GitHub number | GitHub's | `attachments/<clientId>/report-screenshot.png`, `report-image-1.jpg` in the mirror (saved before GitHub gives a number); see [§11.3](#113-screenshots) |
 
 Files are the default because a coding agent reads them natively (no token, no webhook), the
 complaint and its fix travel in one pull request, and they survive a database reset. If issue text may
@@ -284,43 +306,44 @@ and the comments survive and a person can edit it:
 ````markdown
 ---
 id: "0024"
-title: The Today page shows yesterday’s date in the header after midnight
+title: Harbor Deli shows as late while its order is still proofing
 status: open          # open | triaged | agent-ready | in-progress | done
 kind: bug             # bug | request | question | chore
 priority: P2          # P0 blocking | P1 serious | P2 normal | P3 someday
-reporter: juan
-page: /today
-created: 2026-09-29T20:02:28Z
+reporter: robin
+page: /
+created: 2026-09-29T20:02:29.311Z
 labels: []
 screenshots: [attachments/0024-screenshot.png]
 attachments: [attachments/0024-screenshot.png]
 client_id: ee5e7937-b1d8-43bc-9dfa-5bbf84365fb0
 ---
 
-The Today page shows yesterday’s date in the header after midnight.
+Harbor Deli shows as late while its order is still proofing.
 
 ![Screenshot](attachments/0024-screenshot.png)
 
 ```json context
 {
-  "route": "/today",
-  "url": "http://localhost:3171/today",
+  "route": "/",
+  "url": "http://localhost:3172/",
   "filters": {},
   "client": { "userAgent": "…", "viewport": "1440×900", "pixelRatio": 2, "touch": false },
   "journaledAt": "2026-09-29T20:02:28.947Z",
-  "user": "juan",
-  "reporterVerification": "verified"
+  "reporter": "robin",
+  "reporterVerification": "session"
 }
 ```
 ````
 
-(From the Capital OS demo server; invented.)
+(From `examples/next-app`; invented.)
 
 Rules:
 
 - **Managed fields**, in this order: `id` (always quoted), `title`, `status`, `kind`, `priority` (each
-  of the three padded and followed by its comment), `reporter`, `page`, `created` (UTC, no
-  milliseconds), `closed_at` (when done), `labels` (a `[a, b]` list), `screenshots` and `attachments`
+  of the three padded and followed by its comment), `reporter`, `page`, `created` (UTC ISO with
+  milliseconds, so two issues filed in one second still sort and export apart; files written by hand
+  without them read fine), `closed_at` (when done), `labels` (a `[a, b]` list), `screenshots` and `attachments`
   (lists, omitted when empty).
 - **Unmanaged lines** (`client_id:`, `assignee:`, `branch:`, `fixed_in:`, anything a person adds) are
   kept verbatim, in order, after the managed fields, through every rewrite. Changing a status must never
@@ -418,7 +441,7 @@ GitHub has no API for the private user-attachment uploads the web UI uses
 | Mode | How | Visible to | Trade-off |
 |---|---|---|---|
 | `local` (default) | Pictures stay on your server; the issue links to your attachment route | whoever can pass your app's auth | GitHub readers without app access see broken links, which is the point |
-| `repo` | `PUT /repos/{owner}/{assets}/contents/{path}/{clientId}/N.png` into a **private** repository you name, linked from the issue | collaborators of that repository | Needs Contents: write. The store checks the repository is private and refuses a public one. A picture committed to git **stays in its history** after the issue is closed or deleted; removing it takes a history rewrite. |
+| `repo` | `PUT /repos/{owner}/{assets}/contents/{path}/{clientId}/report-screenshot.png` (and `report-image-N.ext`) into a **private** repository you name (`path` defaults to `feedback`), linked from the issue | collaborators of that repository | Needs Contents: write. The store checks the repository is private and keeps the pictures local if it is public (unless `allowPublic`). **A dropped image the body no longer shows is never uploaded**: only what the report shows leaves your server. A picture committed to git **stays in its history** after the issue is closed or deleted; removing it takes a history rewrite. |
 | `none` | Pictures stay local; the issue says how many there are | nobody on GitHub | Safest; the issue alone is often too thin to act on |
 
 **Privacy warning.** A screenshot shows whatever was on the reporter's screen: names, amounts, private
@@ -444,8 +467,9 @@ labels patch replaces the free labels but never the managed ones.
 ### 11.5 Two-way status sync
 
 - **Out:** `update()` PATCHes the issue: labels, and `state` (`closed` for done, `open` otherwise).
-- **In:** `sync()` lists issues with the base label updated since the last sync (`since=`, sorted by
-  `updated`, paginated with the `Link` header), and for each: closed → `done` (recording `closed_at`);
+- **In:** `sync()` lists the repository's issues carrying the base label (`labels=feedback`), updated
+  since the last sync (`since=`, `sort=updated&direction=asc`, 100 a page, following the `Link` header's
+  `rel="next"`), skips pull requests, and for each: closed → `done` (recording `closed_at`);
   open → its `status:*` label, else, if the mirror said done, `open` (a reopen), else unchanged. Priority
   comes back from its label. Run it from the ingester's timer (GUESS: every 60 s) or a webhook
   (`issues` events, verified with the webhook secret's HMAC).

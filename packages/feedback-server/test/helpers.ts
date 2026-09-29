@@ -21,12 +21,12 @@ export const id = () => randomUUID();
 export function wire(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     clientId: id(),
-    body: 'The totals row on the invented pipeline page counts soft commitments twice.',
+    body: 'The totals row on the invented orders page counts returns twice.',
     kind: 'bug',
     priority: 'P2',
-    page: '/pipeline',
+    page: '/orders',
     context: {
-      route: '/pipeline', url: 'http://app.test/pipeline?stage=committed', filters: { stage: 'committed' },
+      route: '/orders', url: 'http://app.test/orders?state=late', filters: { state: 'late' },
       client: { userAgent: 'test', viewport: '1440×900', pixelRatio: 2, touch: false },
     },
     screenshots: [],
