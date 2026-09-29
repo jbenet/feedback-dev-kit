@@ -1,0 +1,71 @@
+{
+  "name": "@jbenet/feedback-server",
+  "version": "0.1.0",
+  "description": "Server side of feedback-kit: a journal-first feedback endpoint, a background ingester and issue stores (files, SQLite/Postgres, GitHub Issues).",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./next": {
+      "types": "./dist/next.d.ts",
+      "default": "./dist/next.js"
+    },
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "default": "./dist/node.js"
+    },
+    "./sql": {
+      "types": "./dist/stores/sql.d.ts",
+      "default": "./dist/stores/sql.js"
+    },
+    "./github": {
+      "types": "./dist/stores/github.d.ts",
+      "default": "./dist/stores/github.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test --test-concurrency=1 test/*.test.ts",
+    "prepack": "npm run build"
+  },
+  "peerDependencies": {
+    "@anthropic-ai/sdk": ">=0.60.0",
+    "better-sqlite3": ">=11",
+    "pg": ">=8"
+  },
+  "peerDependenciesMeta": {
+    "@anthropic-ai/sdk": {
+      "optional": true
+    },
+    "better-sqlite3": {
+      "optional": true
+    },
+    "pg": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@anthropic-ai/sdk": "^0.129.0",
+    "@electric-sql/pglite": "^0.5.8",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^26.6.3",
+    "@types/pg": "^8.23.1",
+    "better-sqlite3": "^13.0.3",
+    "pg": "^8.23.0",
+    "typescript": "^7.0.2"
+  }
+}
