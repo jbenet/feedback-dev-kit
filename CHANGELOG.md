@@ -2,6 +2,15 @@
 
 Both packages share one version.
 
+## 0.1.2 — 29 Sep 2026
+
+- Line breaks (Shift+Enter) are stored as plain newlines, not tiptap-markdown's `\` + newline, so the
+  Markdown tab and reopened drafts no longer show a backslash at each break.
+- Tooltips in the sheet show at once on hover and keyboard focus (CSS `data-tip`), instead of the
+  browser's delayed `title` tooltip.
+- Wording: the automatic capture is labelled "Automatic capture may not be exact."; after "Misaligned?"
+  the hint says "Click the **Whole Page** or **Pick a Part** to take a screenshot in your browser."
+
 ## 0.1.1 (29 Sep 2026, unreleased)
 
 The feedback sheet, per Juan's review of 0.1.0.

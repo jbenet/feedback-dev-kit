@@ -1,6 +1,6 @@
 {
   "name": "@jbenet/feedback-server",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Server side of feedback-kit: a journal-first feedback endpoint, a background ingester and issue stores (files, SQLite/Postgres, GitHub Issues).",
   "license": "MIT",
   "author": "Juan Benet",

@@ -84,7 +84,7 @@ export function FeedbackButton({
         className={`${cls}${className ? ` ${className}` : ''}`}
         onClick={() => setOpen(true)}
         aria-keyshortcuts={ariaShortcut(config.shortcut, apple)}
-        title={`Give feedback (${label})`}
+        data-tip={`Give feedback (${label})`}
       >
         {children ?? (variant === 'rail' ? <><span aria-hidden>✎</span> Feedback</> : 'Give feedback')}
         <span className="feedbackkey">{label}</span>
@@ -409,7 +409,7 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
               className="drawerwide"
               onClick={() => setShowDrafts((v) => !v)}
               aria-expanded={showDrafts}
-              title="Unsent reports kept in this browser, started on other pages"
+              data-tip="Unsent reports kept in this browser, started on other pages"
             >
               Drafts · {others.length}
             </button>
@@ -419,7 +419,7 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
             className="drawerwide"
             onClick={toggleWide}
             aria-pressed={wide}
-            title={wide ? 'Back to the narrow panel' : 'Use more of the page for a long report'}
+            data-tip={wide ? 'Back to the narrow panel' : 'Use more of the page for a long report'}
           >
             {wide ? '⇥ Narrower' : '⇤ Wider'}
           </button>
@@ -458,8 +458,8 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
                     <img src={x.dataUrl} alt={`Screenshot ${i + 1}`} />
                   </button>
                   <div className="mdembedbar">
-                    <button type="button" onClick={() => setEditingId(x.id)} title="Draw on this picture">✎ Annotate</button>
-                    <button type="button" className="x" onClick={() => drop(x.id)} aria-label={`Remove screenshot ${i + 1}`} title={`Delete screenshot ${i + 1}`}>×</button>
+                    <button type="button" onClick={() => setEditingId(x.id)} data-tip="Draw on this picture">✎ Annotate</button>
+                    <button type="button" className="x" onClick={() => drop(x.id)} aria-label={`Remove screenshot ${i + 1}`} data-tip={`Delete screenshot ${i + 1}`}>×</button>
                   </div>
                   <div className="shotmeta">
                     <span className={`flag ${x.method === 'screen' ? 'f-ok' : 'f-mute'}`}>{METHOD_LABEL[x.method]}</span>
@@ -470,13 +470,13 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
                         className={`misaligned${x.misaligned ? ' on' : ''}`}
                         aria-pressed={Boolean(x.misaligned)}
                         onClick={() => flagMisaligned(x.id)}
-                        title={
+                        data-tip={
                           'The automatic capture is your browser redrawing the page from its own '
                           + 'markup. It needs no permission and it leaves this panel out — but it '
                           + 'can get spacing, wrapping or a form control subtly wrong.\n\n'
                           + 'Press to tell us it does not match your screen: the report says so, '
                           + 'which helps fix the capture. For exact pixels, press Whole page or '
-                          + "Pick a part below; they use your browser's own screen capture."
+                          + "Pick a part below; they take a screenshot in your browser."
                         }
                       >
                         {x.misaligned ? 'Misaligned · noted' : 'Misaligned? Tell us'}
@@ -497,11 +497,11 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
                 Pick a part
               </button>
               <span
-                className="fbhelp"
+                className="fbhelp" data-tip-end=""
                 tabIndex={0}
                 role="note"
                 aria-label="About screenshots"
-                title={
+                data-tip={
                   (shots.length === 0
                     ? 'Optional — the report files without one.'
                     : 'Adds another; it does not replace what is already here.')
@@ -520,7 +520,7 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
               </p>
             )}
             {shots.some((x) => x.misaligned) && (
-              <p className="mdhint">Thanks — the report says the automatic capture was off. Whole page gives exact pixels.</p>
+              <p className="mdhint">Thanks — the report says the automatic capture was off. Click the <b>Whole Page</b> or <b>Pick a Part</b> to take a screenshot in your browser.</p>
             )}
           </div>
 

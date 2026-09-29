@@ -324,5 +324,5 @@ export async function capturePageExact(region?: Region): Promise<Capture | null>
 
 export const METHOD_LABEL: Record<CaptureMethod, string> = {
   screen: 'Captured from your screen',
-  render: 'Drawn from the page',
+  render: 'Automatic capture may not be exact.',
 };

@@ -78,7 +78,7 @@ screenshot.
 
 ## 3. The automatic screenshot
 
-![The screenshots column: one automatic capture, labelled "Drawn from the page", with Misaligned? Tell us](screenshots/04-screenshots.png)
+![The screenshots column: one automatic capture, labelled "Automatic capture may not be exact.", with Misaligned? Tell us](screenshots/04-screenshots.png)
 
 When the panel opens, it takes a screenshot of the current viewport by itself: no button, no
 permission prompt. It is a **redraw**: the page's DOM cloned into an SVG `foreignObject` and
@@ -86,7 +86,7 @@ rasterised by the browser (the `modern-screenshot` library). Because it is a red
 things out, and it does: everything marked `nocapture` (the panel, the scrim, the status popover) is
 dropped, so the picture shows the page as it was before the panel covered it.
 
-- It is labelled **Drawn from the page**.
+- It is labelled **Automatic capture may not be exact.**.
 - **Aim: pixel perfect.** In PL LabOS tools it differs from the browser's own screenshot on about 0.05%
   of pixels (anti-aliasing), at the top of a page and scrolled. Getting there took self-hosted
   fonts, a zeroed body margin, sticky and fixed elements moved back to where they are on screen,

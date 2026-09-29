@@ -1,6 +1,6 @@
 {
   "name": "@jbenet/feedback-react",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "The client of feedback-kit: a feedback button and keyboard shortcut, a sidebar with automatic and region screenshots, a WYSIWYG markdown field, per-page drafts, an offline outbox, and the issues pages. Extracted from PL LabOS tools.",
   "license": "MIT",
   "author": "Juan Benet",
@@ -48,7 +48,8 @@
     "@tiptap/react": "^3.31.3",
     "@tiptap/starter-kit": "^3.31.3",
     "modern-screenshot": "^4.7.0",
-    "tiptap-markdown": "^0.9.0"
+    "tiptap-markdown": "^0.9.0",
+    "@tiptap/extension-hard-break": "3.31.3"
   },
   "devDependencies": {
     "@types/react": "^19.3.0",

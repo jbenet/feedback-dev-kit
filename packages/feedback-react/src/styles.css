@@ -527,3 +527,15 @@ body:has(.shortcuts-dialog[open]) .fbk .feedbackkey{display:inline}
   box-shadow:0 0 0 3px color-mix(in srgb, var(--fbk-accent) 22%, transparent), 0 6px 18px color-mix(in srgb, var(--fbk-ink) 8%, transparent)}
 .fbk .mdfield:focus-within .mdbar{border-bottom-color:color-mix(in srgb, var(--fbk-accent) 35%, var(--fbk-line))}
 @media (prefers-reduced-motion: reduce){.fbk .mdfield{transition:none}}
+
+/* Immediate tooltips (29 Sep 2026, Juan: the browser's title tooltips are slow). Any element in the kit
+   with data-tip shows it at once on hover and on keyboard focus; long text wraps. data-tip-end aligns the
+   bubble to the element's right edge, for controls near the panel's edge. */
+.fbk [data-tip]{position:relative}
+.fbk [data-tip]:hover::after,.fbk [data-tip]:focus-visible::after{content:attr(data-tip);position:absolute;z-index:40;
+  top:calc(100% + 6px);left:50%;transform:translateX(-50%);width:max-content;max-width:280px;white-space:pre-line;
+  text-align:left;padding:7px 9px;border-radius:6px;background:var(--fbk-ink);color:var(--fbk-surface);
+  font:500 11.5px/1.45 var(--fbk-sans);letter-spacing:0;text-transform:none;box-shadow:0 6px 18px rgba(0,0,0,.18);
+  pointer-events:none}
+.fbk [data-tip][data-tip-end]:hover::after,.fbk [data-tip][data-tip-end]:focus-visible::after{left:auto;right:0;transform:none}
+@media (hover:none){.fbk [data-tip]:hover::after{content:none}}
