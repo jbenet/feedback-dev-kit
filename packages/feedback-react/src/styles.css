@@ -10,7 +10,7 @@
  *   .fbk { --fbk-accent: #1E8F5E; }                     in your stylesheet, or
  *   <FeedbackProvider theme={{ '--fbk-accent': '#1E8F5E' }}>  inline on every root.
  *
- * Two roles are deliberately separate: --fbk-accent is brand and selection; --fbk-clay means
+ * Two roles are deliberately separate: --fbk-accent is brand and selection (default: PLC green); --fbk-clay means
  * refused / blocked and should not change with the brand. Colour is never the only signal —
  * every state also carries a word.
  *
@@ -19,16 +19,16 @@
  * read, and a cross-origin stylesheet (Google Fonts) leaves the picture in fallback fonts.
  */
 :where(.fbk){
-  --fbk-ground:#F5F3EE; --fbk-surface:#FFFFFF; --fbk-ink:#1A1917; --fbk-muted:#5E5A52; --fbk-line:#E4E0D6;
+  --fbk-ground:#F1F4F0; --fbk-surface:#FFFFFF; --fbk-ink:#16201B; --fbk-muted:#54605A; --fbk-line:#DAE3DC;
   --fbk-clay:#BF4A16; --fbk-green:#0E7F55; --fbk-purple:#5F4B9E; --fbk-amber:#8A6410;
-  --fbk-rail:#1A1917; --fbk-rail-ink:#EFEBE2; --fbk-rail-muted:#9C968A; --fbk-rail-line:#332F2A;
-  --fbk-rail-hover:#2C2823; --fbk-rail-raise:#211E1A; --fbk-rail-edge:#443E36;
-  --fbk-rail-soft:#252119; --fbk-rail-text:#C6C0B4; --fbk-rail-dim:#8A8478; --fbk-rail-av:#3D3831;
-  --fbk-hair:#F0EDE5; --fbk-tint:#FAF8F3;
+  --fbk-rail:#11251D; --fbk-rail-ink:#E6F0E9; --fbk-rail-muted:#8FA298; --fbk-rail-line:#1F3B30;
+  --fbk-rail-hover:#1B3427; --fbk-rail-raise:#162C22; --fbk-rail-edge:#2E5040;
+  --fbk-rail-soft:#17301F; --fbk-rail-text:#BCCDC2; --fbk-rail-dim:#7D9187; --fbk-rail-av:#2A4A3A;
+  --fbk-hair:#EAF0EA; --fbk-tint:#F7FAF7;
   /* Labels: darker than --fbk-muted, because small caps in a light weight read as texture. */
-  --fbk-label:#46423B;
-  --fbk-accent:#BF4A16; --fbk-accent-ink:#FFFFFF; --fbk-accent-soft:#FCF6F2;
-  --fbk-accent-line:#E4D3C6; --fbk-accent-wash:#FBF9F4; --fbk-accent-halo:#F6E4DA;
+  --fbk-label:#3A4740;
+  --fbk-accent:#1E8F5E; --fbk-accent-ink:#FFFFFF; --fbk-accent-soft:#EFF8F3;
+  --fbk-accent-line:#BFE0CE; --fbk-accent-wash:#F4F9F5; --fbk-accent-halo:#D8EEE2;
   --fbk-display:'Fraunces','Fraunces Variable',Georgia,serif;
   --fbk-sans:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
   --fbk-mono:'IBM Plex Mono',ui-monospace,monospace;
@@ -514,3 +514,16 @@ body:has(.shortcuts-dialog[open]) .fbk .feedbackkey{display:inline}
 .fbk .velocity-open{fill:none;stroke:var(--fbk-ink);stroke-width:2}
 .fbk .velocity-open.upper{stroke-dasharray:4 3;stroke:var(--fbk-muted)}
 .fbk .velocity-note{font-size:12px;margin:8px 0}
+
+/* 29 Sep 2026 (Juan): the panel's own heading, the (?) help beside the capture buttons, and a clear
+   focus state on the description so the eye goes straight to where you type. */
+.fbk .drawerhead .fbhead{margin:0 auto 0 0;font-size:20px;line-height:1.2;letter-spacing:0;text-transform:none}
+.fbk .fbhelp{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;
+  border:1px solid var(--fbk-line);color:var(--fbk-muted);font-size:12px;font-weight:600;cursor:help;
+  align-self:center;background:var(--fbk-surface)}
+.fbk .fbhelp:hover,.fbk .fbhelp:focus-visible{color:var(--fbk-ink);border-color:var(--fbk-accent);outline:none}
+.fbk .mdfield{transition:border-color .12s ease, box-shadow .12s ease}
+.fbk .mdfield:focus-within{border-color:var(--fbk-accent);
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--fbk-accent) 22%, transparent), 0 6px 18px color-mix(in srgb, var(--fbk-ink) 8%, transparent)}
+.fbk .mdfield:focus-within .mdbar{border-bottom-color:color-mix(in srgb, var(--fbk-accent) 35%, var(--fbk-line))}
+@media (prefers-reduced-motion: reduce){.fbk .mdfield{transition:none}}

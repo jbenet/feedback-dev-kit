@@ -1,7 +1,7 @@
 /* The example's own shell: a dark rail and a paper page, in the kit's colours (--fbk-* live on .fbk,
    so the shell repeats the few it needs). */
-:root{--ground:#F5F3EE;--surface:#fff;--ink:#1A1917;--muted:#5E5A52;--line:#E4E0D6;--hair:#F0EDE5;
-  --rail:#1A1917;--rail-ink:#EFEBE2;--rail-muted:#9C968A;--rail-line:#332F2A;--rail-hover:#2C2823;--accent:#BF4A16;
+:root{--ground:#F1F4F0;--surface:#FFFFFF;--ink:#16201B;--muted:#54605A;--line:#DAE3DC;--hair:#EAF0EA;
+  --rail:#11251D;--rail-ink:#E6F0E9;--rail-muted:#8FA298;--rail-line:#1F3B30;--rail-hover:#1B3427;--accent:#1E8F5E;
   --display:'Fraunces','Fraunces Variable',Georgia,serif;--sans:'IBM Plex Sans',system-ui,sans-serif;--mono:'IBM Plex Mono',ui-monospace,monospace}
 *{box-sizing:border-box}
 html,body{height:100%}

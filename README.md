@@ -153,7 +153,7 @@ import { Providers } from '@/components/Providers';
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head><script dangerouslySetInnerHTML={{ __html: VIEWPORT_BOOT }} /></head>
       <body>
         <Providers userLabel="…your user's name…">
@@ -166,6 +166,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   );
 }
 ```
+
+`suppressHydrationWarning` on `<html>` is needed: the kit sets the `--app-h` viewport height on `<html>` before React hydrates.
+
 
 **5. The issues pages:**
 

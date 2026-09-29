@@ -13,11 +13,11 @@ async function openWithShortcut(page: Page) {
     await expect(box).toBeVisible({ timeout: 500 });
   }).toPass();
   // Keyboard-first: the cursor is in the description as soon as the box is up.
-  await expect(page.getByRole('textbox', { name: 'What happened' })).toBeFocused();
+  await expect(page.getByRole('textbox', { name: 'Enter any feedback' })).toBeFocused();
   return box;
 }
 
-const editor = (page: Page) => page.getByRole('textbox', { name: 'What happened' });
+const editor = (page: Page) => page.getByRole('textbox', { name: 'Enter any feedback' });
 const shotsLabel = (page: Page) => page.getByRole('dialog', { name: 'Give feedback' }).locator('.fbshots > .lbl');
 
 /** A small PNG made in the page, dropped onto the markdown field as a file. */

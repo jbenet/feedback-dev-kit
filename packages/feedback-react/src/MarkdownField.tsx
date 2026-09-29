@@ -253,7 +253,7 @@ export function MarkdownField({
     editorProps: {
       attributes: {
         class: 'mdrich',
-        'aria-label': label ?? 'What happened',
+        'aria-label': label ?? 'Enter any feedback',
         'aria-multiline': 'true',
         role: 'textbox',
         style: `min-height:${rows * 22}px`,
@@ -444,7 +444,7 @@ export function MarkdownField({
             rows={rows}
             value={source ?? value}
             placeholder={placeholder}
-            aria-label={label ?? 'What happened'}
+            aria-label={label ?? 'Enter any feedback'}
             spellCheck={false}
             onChange={(e) => {
               setSource(e.target.value);

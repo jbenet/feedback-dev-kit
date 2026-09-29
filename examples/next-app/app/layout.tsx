@@ -22,7 +22,7 @@ export const metadata: Metadata = { title: 'feedback-kit example', description: 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const user = demoUser((await cookies()).get(DEMO_USER_COOKIE)?.value);
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         {/* The window's real height, before first paint (iPad Safari's 100dvh is taller than the page). */}
         <script dangerouslySetInnerHTML={{ __html: VIEWPORT_BOOT }} />

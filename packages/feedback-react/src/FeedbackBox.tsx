@@ -402,7 +402,7 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
         aria-label="Give feedback"
       >
         <div className="drawerhead">
-          <div className="lbl">Feedback</div>
+          <h2 className="fbhead">Feedback</h2>
           {others.length > 0 && state !== 'saved' && (
             <button
               type="button"
@@ -445,13 +445,6 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
             </p>
           </div>
         )}
-
-        <h2>What went wrong?</h2>
-        <p className="sublede" style={{ marginBottom: 14 }}>
-          A description is enough. The title is written for you from it, and the page you are on
-          and your filters are captured. Filing saves it on the server at once; if the server
-          cannot be reached, it is kept in this browser and sent when it answers.
-        </p>
 
         <div className="fbcols">
           <div className="fbshots">
@@ -503,14 +496,22 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
                 <span className="gl" aria-hidden>⌖</span>
                 Pick a part
               </button>
+              <span
+                className="fbhelp"
+                tabIndex={0}
+                role="note"
+                aria-label="About screenshots"
+                title={
+                  (shots.length === 0
+                    ? 'Optional — the report files without one.'
+                    : 'Adds another; it does not replace what is already here.')
+                  + " Both use your browser's screen capture for exact pixels where it can, and it will ask permission. "
+                  + 'Click a screenshot to annotate it; use its × to delete it.'
+                }
+              >
+                ?
+              </span>
             </div>
-            <p className="mdhint" style={{ border: 0, padding: '7px 0 0' }}>
-              {shots.length === 0
-                ? 'Optional — the report files without one.'
-                : 'Adds another; it does not replace what is already here.'}
-              {' '}Both use your browser&rsquo;s screen capture for exact pixels where it can,
-              and it will ask permission.
-            </p>
             {failed && (
               <p className="mdhint refused">
                 No capture came back — declined, unsupported, or it took too long. Everything else
@@ -519,11 +520,6 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
             )}
             {shots.some((x) => x.misaligned) && (
               <p className="mdhint">Thanks — the report says the automatic capture was off. Whole page gives exact pixels.</p>
-            )}
-            {shots.length > 0 && (
-              <p className="mdhint">
-                {config.destinationNote} Click an image to annotate it; use its × to delete it.
-              </p>
             )}
           </div>
 
@@ -537,7 +533,7 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
             )}
 
             <div className="field">
-              <span className="lbl">What happened</span>
+              <span className="lbl">Enter any feedback:</span>
               <MarkdownField
                 key={generation}
                 value={body}
@@ -547,9 +543,9 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
                 onPendingChange={setImagesPending}
                 onAnnotate={(i) => setEditingImage(i)}
                 autoFocus
-                label="What happened"
+                label="Enter any feedback"
                 placeholder={
-                  'What you expected, what happened instead.\n\n'
+                  'What you expected, what happened instead.\n'
                   + 'Markdown works. Drop or paste a screenshot from somewhere else in here.'
                 }
               />
@@ -574,10 +570,6 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
                 </select>
               </label>
             </div>
-            <p className="note" style={{ marginTop: 0 }}>
-              {PRIORITY_MEANS[priority]}. <b>No date is promised against a priority</b> — how
-              fast anything is fixed depends on how full the queue is.
-            </p>
 
             {state === 'failed' && (
               <div className="warn" role="alert" style={{ marginTop: 12 }}>
