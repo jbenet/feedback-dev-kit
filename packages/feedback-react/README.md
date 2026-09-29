@@ -115,7 +115,7 @@ Every prop is optional; without a provider the defaults apply.
 | `storagePrefix` | `feedbackkit` | Names of the localStorage keys and IndexedDB databases. |
 | `issueHref(id)` | `/issues/<id>` | Where "Filed as issue N" and list rows link. |
 | `theme` | `{}` | CSS variable overrides, applied inline on every root the kit draws, on top of the default PLC green theme. `GREEN_THEME` is an example (see [Theming](#theming)). |
-| `destinationNote` | "Filed with the issue on the server." | Accepted for compatibility; not currently rendered (the sentence it fed was removed from the panel — see the changelog). |
+| `destinationNote` | "Filed with the issue on the server." | Where screenshots go; shown at the end of the screenshot (?) tooltip. |
 | `pathname`, `search` | `window.location` | The page, from your router, so client-side navigation is seen. |
 
 `openFeedback()` opens the box from any control of your own.
@@ -157,7 +157,7 @@ The variables: `--fbk-ground --fbk-surface --fbk-ink --fbk-muted --fbk-line --fb
 --fbk-label --fbk-accent --fbk-accent-ink --fbk-accent-soft --fbk-accent-line --fbk-accent-wash
 --fbk-accent-halo --fbk-clay --fbk-green --fbk-purple --fbk-amber --fbk-rail* --fbk-display
 --fbk-sans --fbk-mono --fbk-drawer-w`. `--fbk-clay` means refused/blocked and should not follow
-the brand colour. `GREEN_THEME` (exported alongside the components) holds the default's own values,
+the brand colour. `CLAY_THEME` (exported) is the original clay-and-paper palette as a ready re-skin; `GREEN_THEME` spells out the default's own values,
 as a worked example of the shape a `theme` object takes.
 
 ## Differences from PL LabOS tools

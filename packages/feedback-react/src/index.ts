@@ -5,7 +5,7 @@
  * FeedbackProvider (optional), and mount a FeedbackButton in the layout.
  */
 export {
-  FeedbackProvider, useFeedbackConfig, resolveConfig, currentLocation, themeStyle, DEFAULT_SHORTCUT, GREEN_THEME,
+  FeedbackProvider, useFeedbackConfig, resolveConfig, currentLocation, themeStyle, DEFAULT_SHORTCUT, GREEN_THEME, CLAY_THEME,
   type FeedbackConfig, type FeedbackEndpoints, type FeedbackShortcut, type ResolvedFeedbackConfig,
 } from './config';
 

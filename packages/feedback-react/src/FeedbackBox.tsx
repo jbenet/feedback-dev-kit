@@ -506,7 +506,8 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
                     ? 'Optional — the report files without one.'
                     : 'Adds another; it does not replace what is already here.')
                   + " Both use your browser's screen capture for exact pixels where it can, and it will ask permission. "
-                  + 'Click a screenshot to annotate it; use its × to delete it.'
+                  + 'Click a screenshot to annotate it; use its × to delete it. '
+                  + config.destinationNote
                 }
               >
                 ?

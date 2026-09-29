@@ -745,10 +745,9 @@ Kit addition: a status `<select>` that PATCHes and shows the saved state; the se
   `--fbk-rail-ink`, `--fbk-rail-muted`, `--fbk-rail-text`, `--fbk-rail-line`, `--fbk-rail-edge`,
   `--fbk-rail-soft`, `--fbk-rail-raise`, `--fbk-rail-hover`, `--fbk-rail-dim`, `--fbk-rail-av`. Override
   them in CSS (`.fbk { --fbk-accent: … }`) or with the provider's `theme` prop. The default values are
-  PLC green (`--fbk-accent: #1E8F5E`, a dark green `--fbk-rail`), not PL LabOS tools' clay; PL LabOS
-  tools' palette is still available as the exported `GREEN_THEME` constant for a re-skin the other
-  direction (naming aside, it now matches the default — kept as a documented example of the `theme`
-  prop's shape, not because it changes anything).
+  PLC green (`--fbk-accent: #1E8F5E`, a dark green `--fbk-rail`). The original clay-and-paper palette
+  is exported as `CLAY_THEME`, a ready re-skin to pass as `theme`; `GREEN_THEME` spells out the
+  default's own values.
 - **Focus ring on the description.** `.mdfield:focus-within` gets `--fbk-accent`'s border colour and a
   colour-mixed box-shadow (`color-mix(in srgb, var(--fbk-accent) 22%, transparent)`), so the field the
   cursor is in is visually obvious the instant the panel opens (it also has initial focus, [§11](#11-keyboard)).

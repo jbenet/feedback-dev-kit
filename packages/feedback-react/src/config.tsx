@@ -130,7 +130,17 @@ export function currentLocation(c: ResolvedFeedbackConfig): { path: string; filt
   };
 }
 
-/** PL LabOS tools' green theme, as an example of a re-skin: pass as `theme`. */
+/** The original clay-and-paper palette, as a re-skin example: pass as `theme`. */
+export const CLAY_THEME: Record<string, string> = {
+  '--fbk-ground': '#F5F3EE', '--fbk-ink': '#1A1917', '--fbk-muted': '#5E5A52', '--fbk-line': '#E4E0D6',
+  '--fbk-rail': '#1A1917', '--fbk-rail-ink': '#EFEBE2', '--fbk-rail-muted': '#9C968A', '--fbk-rail-line': '#332F2A',
+  '--fbk-rail-hover': '#2C2823', '--fbk-rail-raise': '#211E1A', '--fbk-rail-edge': '#443E36',
+  '--fbk-rail-soft': '#252119', '--fbk-rail-text': '#C6C0B4', '--fbk-hair': '#F0EDE5', '--fbk-label': '#46423B',
+  '--fbk-accent': '#BF4A16', '--fbk-accent-soft': '#FCF6F2', '--fbk-accent-line': '#E4D3C6',
+  '--fbk-accent-wash': '#FBF9F4', '--fbk-accent-halo': '#F6E4DA',
+};
+
+/** The default PLC green values, spelled out (the default theme already uses them). */
 export const GREEN_THEME: Record<string, string> = {
   '--fbk-ground': '#F1F4F0', '--fbk-ink': '#16201B', '--fbk-muted': '#54605A', '--fbk-line': '#DAE3DC',
   '--fbk-rail': '#11251D', '--fbk-rail-ink': '#E6F0E9', '--fbk-rail-muted': '#8FA298', '--fbk-rail-line': '#1F3B30',
