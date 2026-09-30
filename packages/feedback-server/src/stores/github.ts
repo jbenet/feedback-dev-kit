@@ -313,7 +313,8 @@ export function githubStore(options: GitHubStoreOptions): FeedbackStore & { file
           const local = await files.get(padId(gi.number));
           if (!local) continue;
           const names = labelNames(gi.labels);
-          const labelled = names.map((l) => /^status:(.+)$/.exec(l)?.[1]).find((s): s is IssueStatus => (STATUSES as readonly string[]).includes(s ?? ''));
+          // Reopening on GitHub leaves our status:done label behind; an open issue is never done.
+          const labelled = names.map((l) => /^status:(.+)$/.exec(l)?.[1]).find((s): s is IssueStatus => s !== 'done' && (STATUSES as readonly string[]).includes(s ?? ''));
           const status: IssueStatus = gi.state === 'closed' ? 'done' : labelled ?? (local.status === 'done' ? 'open' : local.status);
           const priority = (names.map((l) => /^priority:(P[0-3])$/.exec(l)?.[1]).find(Boolean) ?? local.priority) as IssuePriority;
           const kind = (names.map((l) => /^kind:(bug|request|question|chore)$/.exec(l)?.[1]).find(Boolean) ?? local.kind) as Issue['kind'];

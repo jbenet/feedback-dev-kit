@@ -213,10 +213,10 @@ test('status out (labels, close) and back in (sync, by GitHub\'s own timestamps)
   assert.equal(gh.issues[0]!.state, 'closed');
   assert.deepEqual(gh.issues[0]!.labels.map((l) => l.name).sort(), ['feedback', 'kind:bug', 'needs-design', 'priority:P1', 'status:done']);
 
-  // Changes made on GitHub: 0002 closed, 0003 labelled triaged, 0001 reopened.
+  // Changes made on GitHub: 0002 closed, 0003 labelled triaged, 0001 reopened (GitHub keeps its status:done label).
   gh.issues[1]!.state = 'closed'; gh.issues[1]!.updated_at = gh.stamp();
   gh.issues[2]!.labels = gh.issues[2]!.labels.filter((l) => !l.name.startsWith('status:')).concat({ name: 'status:triaged' }); gh.issues[2]!.updated_at = gh.stamp();
-  gh.issues[0]!.state = 'open'; gh.issues[0]!.labels = gh.issues[0]!.labels.filter((l) => l.name !== 'status:done'); gh.issues[0]!.updated_at = gh.stamp();
+  gh.issues[0]!.state = 'open'; gh.issues[0]!.updated_at = gh.stamp();
   const synced = await store.sync();
   assert.equal(synced.updated, 3);
   assert.equal((await store.get('0001'))?.status, 'open');

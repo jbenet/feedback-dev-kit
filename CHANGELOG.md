@@ -11,6 +11,8 @@ Both packages share one version.
   base label (default `feedback`); `FEEDBACK_APP_URL` the address the picture links use.
 - `githubStore`: `token` may be a function, asked before each request; `destination` sets the sentence
   the issues pages show.
+- `githubStore` sync: an issue reopened on GitHub comes back as open. GitHub keeps the `status:done`
+  label on reopen, and sync used to read it and leave the mirror at done.
 
 ## 0.1.2 — 29 Sep 2026
 
