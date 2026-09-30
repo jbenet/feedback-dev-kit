@@ -119,6 +119,7 @@ The server also accepts `client_id`, an optional `title` (from agents filing thr
 | `accept` | `true` | `false` (or a function) answers 403 with `refusalMessage`. Use this on every server that must not file: only one server may hand out numbers. |
 | `exportToken` | `$FEEDBACK_EXPORT_TOKEN` | |
 | `authorize(req, action)` | allow all | `action` is `'read'`, `'update'` or `'attachment'`. Return true, false (403) or your own Response (a 401, say). Issues can hold anything a reporter saw: **supply this**, as you supply `resolveReporter`, or every issue and picture is readable by anyone who can reach the server. The example's is a demo "sign in as" cookie, which is not authentication. |
+| `onSuspicious` | `'flag'` | `'refuse'` answers 422 when the report matches the prompt-injection patterns ([Prompt injection](#prompt-injection)); the browser keeps it and shows the reason. `'flag'` leaves it to the ingester. |
 | `onJournaled(clientId)` | kick the ingester | |
 
 ### `startIngester(options)` / `createIngester(options)`
@@ -136,6 +137,10 @@ The server also accepts `client_id`, an optional `title` (from agents filing thr
 | `everyMs` | 10 s | Passes also run at start-up and after each journal write. |
 | `backoff(attempts)` | 2 s, 10 s, 30 s, 2 min, then every 5 min | Per entry. A store's `RetryLaterError` waits at least as long as it asks and pauses the pass. |
 | `syncEveryMs` | 60 s | For stores with `sync()` (GitHub). |
+| `screen` | none | An extra prompt-injection screen, `(input, signal) => Promise<{ action, reasons }>`; `anthropicScreen()` reads the pictures too. The patterns always run. |
+| `onSuspicious` | `'flag'` | `'refuse'` sets a suspicious report aside in `refused/` instead of filing it flagged. |
+| `suspiciousLabel` | `suspicious` | |
+| `screenTimeoutMs` | 20 s | A screen that fails or times out flags the report. |
 | `onFiled(issue, entry)` | none | Use it to notify a channel or start an agent. |
 
 ### Titles
@@ -155,6 +160,31 @@ startIngester({ journal, store, generateTitle: anthropicTitle({ model: 'claude-h
   characters at most.
 - A title the sender typed is kept as given, and no model is called.
 - It runs in the ingester, never on the request.
+
+### Prompt injection
+
+A report is written by whoever can reach the box and read by people and agents. Every report is
+**neutralized** before filing (invisible characters removed; HTML comments, which GitHub hides, shown as
+text) and **screened** by patterns for the usual shapes of an injection: asks to ignore instructions,
+role changes, chat markup, commands to run, requests to send secrets, text addressed to an AI.
+
+```ts
+import { anthropicScreen } from '@jbenet/feedback-server';
+startIngester({ journal, store, screen: anthropicScreen() });   // also reads text in screenshots
+```
+
+- **Flagged** (default): the issue gets the `suspicious` label, a warning at the top of its body, the
+  reasons in `context.screening`, and a first-sentence title (no model reads it for a title).
+- **Refused** (`onSuspicious: 'refuse'` on the ingester, or a screen that says so): set aside in
+  `refused/` with the reasons. On the handler, `onSuspicious: 'refuse'` answers 422 at once instead.
+- The patterns are heuristics. They also flag some honest reports that talk about prompts, which is
+  why the default flags and a person decides.
+- `anthropicScreen()` sends the text and up to four pictures to Anthropic's API (`FEEDBACK_SCREEN_API_KEY`,
+  then `ANTHROPIC_API_KEY`; `FEEDBACK_SCREEN_MODEL`, default `claude-haiku-4-5`). Without a key it says
+  nothing and the patterns decide.
+- `neutralize()`, `screenText()` and `patternScreen()` are exported for readers: an agent reading the
+  queue checks again, since an issue can be edited after filing. How agents treat issues is in
+  [docs/TRIAGE.md §10](../../docs/TRIAGE.md#10-untrusted-input-prompt-injection).
 
 ## Stores
 
@@ -286,6 +316,7 @@ confidential data.
 | `FEEDBACK_TITLE_API_KEY`, then `ANTHROPIC_API_KEY` | `anthropicTitle`, the default `generateTitle` | Titles by Claude. Unset: no model is called. |
 | `FEEDBACK_TITLE_MODEL` | `anthropicTitle` | Default `claude-haiku-4-5`. |
 | `FEEDBACK_TITLE_SCREENSHOT` | `anthropicTitle` | `0` keeps the screenshot out of the title request. |
+| `FEEDBACK_SCREEN_API_KEY`, then `ANTHROPIC_API_KEY`; `FEEDBACK_SCREEN_MODEL` | `anthropicScreen` | The model screen, when you pass it as `screen`. |
 | `FEEDBACK_GITHUB_TOKEN`, then `GITHUB_TOKEN` | `githubStore` | The token for the issues repository. |
 
 (`FEEDBACK_DATA` belongs to the example app, not the package: the folder it journals and files into.)
@@ -310,6 +341,7 @@ The tests cover:
 - idempotency before and after filing;
 - ingest retries, backoff, rate-limit pauses, refusals and identify failures;
 - titles;
+- prompt injection: the patterns against attacks and honest reports, neutralizing, flag and refuse, the model screen;
 - every store on better-sqlite3, `node:sqlite`, PGlite and optionally real Postgres;
 - the GitHub store against a mocked fetch;
 - size and origin refusals;

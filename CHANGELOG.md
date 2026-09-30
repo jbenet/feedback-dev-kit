@@ -4,6 +4,11 @@ Both packages share one version.
 
 ## Unreleased
 
+- **Prompt injection** (issue #6). The ingester neutralizes every report (invisible characters removed,
+  HTML comments shown as text) and screens it by patterns; a hit is filed with the `suspicious` label and
+  a warning on top, or refused with `onSuspicious: 'refuse'` (the handler then answers 422 with the reason,
+  which the reporter sees). `screen: anthropicScreen()` adds a model that also reads the screenshots.
+  docs/TRIAGE.md §10 says how agents read the queue: as untrusted data, skipping `suspicious` issues.
 - **GitHub issue filing in the example.** Set `FEEDBACK_GITHUB_REPO=owner/name` and the example files
   reports as GitHub issues (`githubStore`) instead of markdown files, mirrored in `.data/github`, with
   pictures linked from this server (`FEEDBACK_GITHUB_PICTURES=link`, the default), uploaded to a

@@ -22,6 +22,7 @@ import { ingesterFor } from './ingest.ts';
 import { createJournal, type Journal } from './journal.ts';
 import { checkOrigin, type OriginPolicy } from './origin.ts';
 import { STATUSES, KINDS, PRIORITIES, type FeedbackStore, type IssueFilter, type IssuePatch, type IssueStatus, type IssueKind, type IssuePriority } from './types.ts';
+import { patternScreen } from './injection.ts';
 import { checkReport, DEFAULT_LIMITS, isClientId, newClientId, type Limits } from './validate.ts';
 
 export type Action = 'read' | 'update' | 'attachment';
@@ -63,6 +64,12 @@ export interface HandlerOptions {
    * anything a reporter saw; put them behind your auth. Return a Response to answer with it instead.
    */
   authorize?: (req: Request, action: Action) => boolean | Response | Promise<boolean | Response>;
+  /**
+   * A report that looks like a prompt injection (injection.ts): 'flag' (default) journals it and the
+   * ingester files it flagged; 'refuse' answers 422 with the reasons, and the reporter's browser keeps
+   * the report and shows why it was not filed.
+   */
+  onSuspicious?: 'flag' | 'refuse';
   /** Called after a new report is journaled. Default: kick the ingester started for this journal. */
   onJournaled?: (clientId: string) => void;
 }
@@ -151,6 +158,12 @@ export function createFeedbackHandler(options: HandlerOptions): FeedbackHandler 
     const clientId = (given as string | undefined) ?? newClientId();
     const checked = checkReport(raw, limits);
     if (!checked.ok) return json({ error: checked.error, clientId }, checked.status);
+    if (options.onSuspicious === 'refuse') {
+      const { reasons } = patternScreen({ body: checked.value.body, context: checked.value.context });
+      if (reasons.length) {
+        return json({ error: `Not filed: it reads like instructions to an automated system (${reasons.join('; ')}). Describe the problem in your own words and send again.`, clientId }, 422);
+      }
+    }
 
     let reporter: string | null = null;
     try {

@@ -14,3 +14,8 @@ export { fileStore, type FileStore, type FileStoreOptions } from './stores/files
 export { parseIssue, serializeIssue, slugify, type ParsedIssue } from './stores/format.ts';
 export { sqlStore, migrate, MIGRATIONS, pgDriver, sqliteDriver, type SqlStoreOptions, type SqlDriver, type Migration } from './stores/sql.ts';
 export { githubStore, rateLimitWait, marker, type GitHubStoreOptions, type GitHubAttachments } from './stores/github.ts';
+export {
+  neutralize, screenText, patternScreen, flagNote,
+  type Neutralized, type ScreenInput, type ScreenVerdict, type ScreenReport,
+} from './injection.ts';
+export { anthropicScreen, type AnthropicScreenOptions } from './ai-screen.ts';

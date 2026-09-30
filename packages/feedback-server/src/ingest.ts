@@ -15,6 +15,7 @@
 import { performance } from 'node:perf_hooks';
 import { defaultGenerateTitle, type GenerateTitle } from './ai-title.ts';
 import { createJournal, type Journal } from './journal.ts';
+import { flagNote, neutralize, patternScreen, type ScreenInput, type ScreenReport, type ScreenVerdict } from './injection.ts';
 import { sanitizeTitle, titleFrom } from './title.ts';
 import { RefusedError, RetryLaterError, type FeedbackStore, type Issue, type IssueDraft, type JournalEntry } from './types.ts';
 
@@ -47,6 +48,19 @@ export interface IngesterOptions {
   syncEveryMs?: number;
   /** How often to sweep crash debris from the journal. Default 1 h. */
   sweepEveryMs?: number;
+  /**
+   * Prompt injection (injection.ts). Every report is neutralized (invisible characters removed,
+   * hidden HTML comments shown) and screened by patterns. `screen` adds a screen of your own, e.g.
+   * anthropicScreen(), which also reads the pictures. A hit is flagged — the `suspiciousLabel` and a
+   * warning at the top of the issue, and no model is asked for its title — unless onSuspicious is
+   * 'refuse' (or your screen says refuse): then it is set aside in refused/ with the reasons.
+   */
+  screen?: ScreenReport | null;
+  onSuspicious?: 'flag' | 'refuse';
+  /** Default 'suspicious'. */
+  suspiciousLabel?: string;
+  /** GUESS: a screen is worth a few seconds, like a title. A screen that fails or times out flags the report. */
+  screenTimeoutMs?: number;
   /** After an issue is filed (notify a channel, kick an agent). Errors are logged and ignored. */
   onFiled?: (issue: Issue, entry: JournalEntry) => void | Promise<void>;
   logger?: Pick<Console, 'warn' | 'info'>;
@@ -84,23 +98,30 @@ export function createIngester(options: IngesterOptions): Ingester {
   const retry = new Map<string, { attempts: number; nextAt: number; lastError: string }>();
   /** A generated title, kept so a retry does not pay for (or change) it again. */
   const titles = new Map<string, string>();
+  const screened = new Map<string, ScreenVerdict>();
+  const screen = options.screen ?? null;
+  const onSuspicious = options.onSuspicious ?? 'flag';
+  const suspiciousLabel = options.suspiciousLabel ?? 'suspicious';
+  const screenTimeout = options.screenTimeoutMs ?? 20_000;
   let pausedUntil = 0;
   let running: Promise<IngestResult> | null = null;
   let again = false;
   const timers: Array<ReturnType<typeof setInterval>> = [];
 
-  async function titleOf(entry: JournalEntry, draft: Omit<IssueDraft, 'title'>): Promise<string> {
-    const given = entry.request.title.trim();
+  async function titleOf(entry: JournalEntry, draft: Omit<IssueDraft, 'title'>, flagged: boolean): Promise<string> {
+    const given = neutralize(entry.request.title).text.trim();
     if (given) return given;
     const cached = titles.get(entry.clientId);
     if (cached) return cached;
+    const bodyText = draft.body;
     let title = '';
-    if (generate) {
+    // A flagged report is not handed to a model: the first sentence names it.
+    if (generate && !flagged) {
       const ac = new AbortController();
       const timer = setTimeout(() => ac.abort(), titleTimeout);
       try {
         title = sanitizeTitle(await generate({
-          clientId: entry.clientId, body: entry.request.body, page: entry.request.page, kind: entry.request.kind,
+          clientId: entry.clientId, body: bodyText, page: entry.request.page, kind: entry.request.kind,
           priority: entry.request.priority, context: entry.request.context, attachments: draft.attachments ?? [],
         }, ac.signal));
       } catch (err) {
@@ -110,7 +131,7 @@ export function createIngester(options: IngesterOptions): Ingester {
       }
     }
     // The first sentence; else the first line with a letter in it (an image's name, say); else "Untitled".
-    title ||= titleFrom(entry.request.body) || sanitizeTitle(entry.request.body.replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')) || 'Untitled';
+    title ||= titleFrom(bodyText) || sanitizeTitle(bodyText.replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')) || 'Untitled';
     titles.set(entry.clientId, title);
     return title;
   }
@@ -123,20 +144,56 @@ export function createIngester(options: IngesterOptions): Ingester {
     return who ?? { handle: 'unknown', verification: 'no user resolved' };
   }
 
+  /** The patterns, then the app's own screen. A screen that throws or times out flags: never file unscreened, never drop. */
+  async function screenOf(input: ScreenInput, title: string): Promise<ScreenVerdict> {
+    const found = patternScreen({ body: `${title}\n${input.body}`, context: input.context });
+    const reasons = [...found.reasons];
+    let refuse = false;
+    if (screen) {
+      const ac = new AbortController();
+      const timer = setTimeout(() => ac.abort(), screenTimeout);
+      try {
+        const v = await screen(input, ac.signal);
+        if (v.action !== 'file') reasons.push(...v.reasons.filter((x) => !reasons.includes(x)));
+        refuse = v.action === 'refuse';
+      } catch (err) {
+        reasons.push('the screen could not run');
+        log.warn(`[feedback] screening failed for ${input.clientId}; flagging it: ${err instanceof Error ? err.message : String(err)}`);
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    if (!reasons.length) return { action: 'file', reasons };
+    return { action: refuse || onSuspicious === 'refuse' ? 'refuse' : 'flag', reasons };
+  }
+
   async function fileOne(entry: JournalEntry): Promise<Issue> {
     const reporter = await reporterOf(entry);
     const { attachments, missing } = await journal.attachments(entry);
     const r = entry.request;
+    const cleaned = neutralize(r.body.trim());
+    const context = {
+      ...r.context, journaledAt: entry.receivedAt, reporter: reporter.handle, reporterVerification: reporter.verification,
+      ...(missing ? { missingAttachments: missing } : {}),
+    };
+    const verdict = screened.get(entry.clientId) ?? await screenOf(
+      { clientId: entry.clientId, body: r.body, page: r.page, kind: r.kind, context: r.context, attachments }, r.title);
+    // Kept, like a title, so a retry neither pays again nor changes its mind.
+    screened.set(entry.clientId, verdict);
+    if (verdict.action === 'refuse') throw new RefusedError(`Refused as a possible prompt injection: ${verdict.reasons.join('; ')}`);
+    const flagged = verdict.action === 'flag';
+    const body = cleaned.text || '(no description given)';
     const base: Omit<IssueDraft, 'title'> = {
-      body: r.body.trim() || '(no description given)', kind: r.kind, priority: r.priority, reporter: reporter.handle, page: r.page,
-      labels: [],
+      body: flagged ? `${flagNote(verdict.reasons)}\n${body}` : body,
+      kind: r.kind, priority: r.priority, reporter: reporter.handle, page: r.page,
+      labels: flagged ? [suspiciousLabel] : [],
       context: {
-        ...r.context, journaledAt: entry.receivedAt, reporter: reporter.handle, reporterVerification: reporter.verification,
-        ...(missing ? { missingAttachments: missing } : {}),
+        ...context,
+        ...(cleaned.changes.length || flagged ? { screening: { ...(flagged ? { flagged: verdict.reasons } : {}), ...(cleaned.changes.length ? { neutralized: cleaned.changes } : {}) } } : {}),
       },
       attachments, tokenOffset: r.imageOffset, clientId: entry.clientId, receivedAt: entry.receivedAt,
     };
-    return store.create({ ...base, title: await titleOf(entry, base) });
+    return store.create({ ...base, title: await titleOf(entry, { ...base, body }, flagged) });
   }
 
   async function pass(): Promise<IngestResult> {
@@ -160,6 +217,7 @@ export function createIngester(options: IngesterOptions): Ingester {
         await journal.markFiled(entry, { id: issue.id, location: issue.location, title: issue.title });
         retry.delete(id);
         titles.delete(id);
+        screened.delete(id);
         result.filed += 1;
         if (options.onFiled) {
           try { await options.onFiled(issue, entry); } catch (err) { log.warn(`[feedback] onFiled failed for ${issue.id}: ${err instanceof Error ? err.message : String(err)}`); }
@@ -169,6 +227,7 @@ export function createIngester(options: IngesterOptions): Ingester {
         if (err instanceof RefusedError) {
           await journal.markRefused(id, message, entry);
           retry.delete(id);
+          screened.delete(id);
           result.refused += 1;
           log.warn(`[feedback] refused ${id}: ${message}`);
           continue;

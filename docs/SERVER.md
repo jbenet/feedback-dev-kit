@@ -404,6 +404,15 @@ Rules:
 - **Single numbering authority.** A server that is not the filing server answers 403 with a sentence,
   so two servers never hand out the same number.
 
+### Prompt injection
+
+Reports are written by strangers and read by agents. The ingester neutralizes every report (invisible
+characters removed, HTML comments shown as text) and screens it by patterns, plus an optional model
+screen that reads the pictures (`screen: anthropicScreen()`). A hit is flagged (the `suspicious`
+label, a warning at the top of the body, `context.screening`) or, with `onSuspicious: 'refuse'`,
+refused: at once with a 422 from the handler, or into `refused/` from the ingester. How readers treat
+issues is in [TRIAGE.md §10](TRIAGE.md#10-untrusted-input-prompt-injection).
+
 ## 11. The GitHub variant
 
 Files → GitHub Issues: the ingester files each report as an issue in a repository you choose, and keeps a
