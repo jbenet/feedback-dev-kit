@@ -506,7 +506,7 @@ body:has(.shortcuts-dialog[open]) .fbk .feedbackkey{display:inline}
 .fbk .velocity-stats b{font-family:var(--fbk-mono);font-size:20px}
 .fbk .velocity-legend{font-size:12px;margin-bottom:6px;color:var(--fbk-ink)}
 .fbk .velocity-closed{color:var(--fbk-green)}
-.fbk .velocity-chart{display:block;width:100%;max-width:720px;height:auto}
+.fbk .velocity-chart{display:block;width:100%;height:auto}
 .fbk .velocity-chart text{fill:var(--fbk-muted);font:11px var(--fbk-mono)}
 .fbk .velocity-axis{stroke:var(--fbk-line)}
 .fbk .velocity-filed-bar{fill:var(--fbk-ink)}
