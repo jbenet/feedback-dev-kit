@@ -4,6 +4,11 @@ Both packages share one version.
 
 ## Unreleased
 
+- **Annotator** (issue #10): a **Select** tool (move or delete a mark, or just leave another tool),
+  **stroke widths** beside the colors, dark tooltips that are never hidden under the picture, and
+  "Color" in US spelling.
+- **Filed screen** (issues #14, #15): numbers read `#12` in one right-aligned column, so titles line up
+  whether numbered or not; nothing on the screen moves or resizes when the number arrives.
 - **The filed screen** (issue #7). File no longer closes the box: it stays open on where the report
   stands ("Sending…", "Saved on the server · being filed", "Kept in this browser…", "Refused…",
   "Filed as issue N"), with **Give more feedback** (⌘/Ctrl+Enter) for another report from the same

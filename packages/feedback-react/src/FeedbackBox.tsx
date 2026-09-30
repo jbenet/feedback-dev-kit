@@ -670,6 +670,9 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
   return mounted ? createPortal(ui, document.body) : null;
 }
 
+/** `#12` for a numeric id (the files store pads it, `0012`), else the id as it is. */
+const issueLabel = (id: string) => (/^\d+$/.test(id) ? `#${Number(id)}` : id);
+
 /** A report filed while the box was open, and where it stands. */
 interface FiledHere { clientId: string; title: string; id: string | null; where: string; refused: boolean }
 
@@ -700,22 +703,29 @@ function standing(out: OutboxState, f: FiledHere): Pick<FiledHere, 'id' | 'where
 function FiledScreen({ current, all, href, modifier, onAgain, onClose }: {
   current: FiledHere; all: FiledHere[]; href: (id: string) => string; modifier: string; onAgain: () => void; onClose: () => void;
 }) {
-  const heading = current.id ? `Filed as issue ${current.id}` : current.where;
+  const heading = current.id ? `Filed as issue ${issueLabel(current.id)}` : current.where;
+  // Nothing on this screen changes size when the number arrives: the heading is one line, the
+  // thanks line is always there, the note under it keeps its line, and Open the issue is the same
+  // element before and after (a link, disabled until there is somewhere to go).
+  const note = current.refused ? '' : current.id
+    ? 'You can close the box, or file another.'
+    : 'Its number shows here when the server gives it one; you can close the box before then.';
   return (
     <div className="fbfiled" role="status" aria-live="polite">
-      <h3 className={`fbfiledhead${current.refused ? ' refused' : ''}`}>{heading}</h3>
-      {!current.refused && (
-        <p className="muted">
-          Thanks — it is in the queue with this page, your filters and any screenshots attached.
-          {!current.id && ' Its number shows here when the server gives it one; you can close the box before then.'}
-        </p>
-      )}
+      <h3 className={`fbfiledhead${current.refused ? ' refused' : ''}`} title={heading}>{heading}</h3>
+      <p className="muted">Thanks — it is in the queue with this page, your filters and any screenshots attached.</p>
+      <p className="muted fbfilednote">{note}</p>
       <div className="acts">
         {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
         <button type="button" className="btn p" onClick={onAgain} autoFocus>Give more feedback</button>
-        {current.id
-          ? <a className="btn" href={href(current.id)}>Open the issue</a>
-          : <button type="button" className="btn" disabled>Open the issue</button>}
+        <a
+          className="btn"
+          href={current.id ? href(current.id) : undefined}
+          aria-disabled={current.id ? undefined : true}
+          role="link"
+        >
+          Open the issue
+        </a>
         <button type="button" className="btn" onClick={onClose}>Close</button>
       </div>
       <div className="keyhint">
@@ -725,12 +735,22 @@ function FiledScreen({ current, all, href, modifier, onAgain, onClose }: {
       {all.length > 1 && (
         <div className="fbfiledlist">
           <div className="lbl">Filed while this was open · {all.length}</div>
+          {/* One grid for all rows, so the number column is as wide as its widest entry and every
+              title starts at the same place, numbered or not. */}
           <ul>
             {all.map((f) => (
               <li key={f.clientId}>
-                {f.id
-                  ? <a href={href(f.id)}><span className="mono">{f.id}</span> {f.title}</a>
-                  : <span data-tip={f.where} title={f.where}><span className="mono">…</span> {f.title}</span>}
+                {f.id ? (
+                  <a href={href(f.id)}>
+                    <span className="fbfiledno">{issueLabel(f.id)}</span>
+                    <span className="fbfiledtitle">{f.title}</span>
+                  </a>
+                ) : (
+                  <span className="fbfiledpending" data-tip={f.where} title={f.where}>
+                    <span className="fbfiledno" aria-label="No number yet">…</span>
+                    <span className="fbfiledtitle">{f.title}</span>
+                  </span>
+                )}
               </li>
             ))}
           </ul>

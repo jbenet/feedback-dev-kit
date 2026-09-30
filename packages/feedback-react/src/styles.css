@@ -165,7 +165,7 @@
 /* The toolbar: icon buttons with tooltips, in one slim row, directly above the picture. A 32 px hit
    area (44 px tall on a touch screen, where the buttons share the row's width), thin dividers
    between the groups, and the active tool drawn inverted as well as announced (aria-pressed). */
-.fbk .setop{display:flex;gap:2px;align-items:center;flex-wrap:nowrap;margin-bottom:8px;position:relative;
+.fbk .setop{display:flex;gap:2px;align-items:center;flex-wrap:nowrap;margin-bottom:8px;position:relative;z-index:10;
   background:#1F1C18;border:1px solid #3B3630;border-radius:9px;padding:4px}
 .fbk .setop .lbl{color:#9C968A}
 .fbk .settools,.fbk .setcols,.fbk .setacts,.fbk .setend{display:flex;gap:2px;align-items:center;min-width:0}
@@ -187,11 +187,21 @@
 /* The tooltip: the button's name, and its shortcut when it has one. */
 .fbk .seticon[data-tip]:hover::after,.fbk .seticon[data-tip]:focus-visible::after{content:attr(data-tip);position:absolute;
   top:calc(100% + 7px);left:50%;transform:translateX(-50%);z-index:6;white-space:nowrap;pointer-events:none;
-  background:#EFEBE2;color:#1A1917;font:500 11px/1.3 var(--fbk-sans);padding:4px 7px;border-radius:5px;
-  box-shadow:0 4px 14px rgba(0,0,0,.35)}
+  background:#1A1917;color:#EFEBE2;border:1px solid #3B3630;font:500 11px/1.3 var(--fbk-sans);padding:4px 7px;border-radius:5px;
+  box-shadow:0 6px 18px rgba(0,0,0,.5)}
+/* The toolbar sits above the picture (z-index on .setop), so its tooltips and popovers are never under it. */
+.fbk .setweight{display:block;width:18px;border-radius:2px;background:currentColor}
+.fbk .setcolour{grid-template-rows:auto auto;align-content:center;gap:3px}
+.fbk .setdotweight{display:block;width:14px;border-radius:2px}
+.fbk .setcolgrid{flex-direction:column;align-items:flex-start}
+.fbk .setcolrow{display:flex;gap:7px;align-items:center}
+.fbk .setweightpick{display:grid;place-items:center;width:30px;height:28px;padding:0;border:1px solid transparent;border-radius:6px;background:none;color:#EFEBE2;cursor:pointer}
+.fbk .setweightpick:hover{background:#312C25}
+.fbk .setweightpick.on{border-color:#EFEBE2}
+.fbk .setweightpick[data-tip]:hover::after,.fbk .setweightpick[data-tip]:focus-visible::after{background:#1A1917;color:#EFEBE2;border:1px solid #3B3630}
 .fbk .setend .seticon[data-tip]:hover::after,.fbk .setend .seticon[data-tip]:focus-visible::after{left:auto;right:0;transform:none}
 @media (pointer: coarse){
-  .fbk .seticon{height:44px;flex:1 1 44px;width:44px;max-width:44px;min-width:30px}
+  .fbk .seticon{height:44px;flex:1 1 44px;width:44px;max-width:44px;min-width:25px}
   .fbk .setdot{width:20px;height:20px}
   /* A finger has no hover: a tooltip would stay up after the tap. */
   .fbk .seticon[data-tip]:hover::after{display:none}
@@ -218,6 +228,7 @@
 .fbk .setcanvas{display:block;max-width:100%;max-height:74vh;margin:0 auto;border-radius:8px; box-shadow:0 12px 44px rgba(0,0,0,.5);background:#fff;touch-action:none}
 .fbk .setcanvas.t-pen,.fbk .setcanvas.t-arrow,.fbk .setcanvas.t-line,.fbk .setcanvas.t-box{cursor:crosshair}
 .fbk .setcanvas.t-text{cursor:text}
+.fbk .setcanvas.t-select{cursor:default}
 /* A placed label is a real object: drag it, resize it, type in it again (issue 0014). The
    offset is the padding and border, so the text itself starts where it will be saved. */
 .fbk .setlabel{position:absolute;transform:translate(-4px,-3px);z-index:2;font-family:var(--fbk-sans); padding:2px 3px;border:1px solid transparent;border-radius:3px;cursor:move}
@@ -545,10 +556,21 @@ body:has(.shortcuts-dialog[open]) .fbk .feedbackkey{display:inline}
 
 /* ---------------- the filed screen: where the report stands, and another ---------------- */
 .fbk .fbfiled{padding:8px 0}
-.fbk .fbfiledhead{font-size:20px;margin:4px 0 8px}
+.fbk .fbfiledhead{font-size:20px;line-height:28px;margin:4px 0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fbk .fbfiledhead.refused{color:var(--fbk-clay)}
-.fbk .fbfiled .acts{margin-top:16px}
+.fbk .fbfiled p{margin:0}
+.fbk .fbfilednote{min-height:3em;margin-top:4px}
+.fbk .fbfiled .acts{margin-top:12px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.fbk .fbfiled .acts .btn{display:flex;align-items:center;justify-content:center;text-align:center;min-height:44px;margin:0;box-sizing:border-box;text-decoration:none}
+.fbk .fbfiled .acts .btn[aria-disabled]{opacity:.45;pointer-events:none;cursor:default}
 .fbk .fbfiledlist{margin-top:20px;border-top:1px solid var(--fbk-line);padding-top:12px}
-.fbk .fbfiledlist ul{list-style:none;margin:6px 0 0;padding:0}
-.fbk .fbfiledlist li{padding:4px 0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.fbk .fbfiledlist .mono{font-family:var(--fbk-mono);margin-right:6px}
+.fbk .fbfiledlist ul{list-style:none;margin:6px 0 0;padding:0;display:grid;grid-template-columns:max-content minmax(0,1fr);column-gap:10px;row-gap:6px}
+.fbk .fbfiledlist li,.fbk .fbfiledlist li>a,.fbk .fbfiledlist li>span{display:grid;grid-column:1/-1;grid-template-columns:subgrid;color:inherit;text-decoration:none}
+.fbk .fbfiledno{font-family:var(--fbk-mono);text-align:right;font-size:13px;line-height:20px}
+.fbk .fbfiledtitle{font-size:13px;line-height:20px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fbk .fbfiledlist a .fbfiledtitle{text-decoration:underline;text-decoration-color:var(--fbk-line);text-underline-offset:3px}
+
+/* Inside the annotation editor every tooltip is the editor's own dark kind, like its floating bars. */
+.fbk .shotedit [data-tip]:hover::after,.fbk .shotedit [data-tip]:focus-visible::after{background:#1A1917;color:#EFEBE2;border:1px solid #3B3630;
+  box-shadow:0 6px 18px rgba(0,0,0,.5);z-index:12;white-space:nowrap}
+.fbk .shotedit .seticon[aria-expanded="true"]:hover::after,.fbk .shotedit .seticon[aria-expanded="true"]:focus-visible::after{display:none}

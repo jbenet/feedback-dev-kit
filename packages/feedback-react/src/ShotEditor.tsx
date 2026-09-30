@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
-type Tool = 'pen' | 'arrow' | 'line' | 'box' | 'text';
+type Tool = 'select' | 'pen' | 'arrow' | 'line' | 'box' | 'text';
 
 interface Stroke { tool: 'pen'; colour: string; width: number; points: Array<[number, number]> }
 interface Arrow { tool: 'arrow'; colour: string; width: number; from: [number, number]; to: [number, number] }
@@ -48,6 +48,7 @@ const icon = (d: string, extra?: React.ReactNode) => (
   </svg>
 );
 const ICON = {
+  select: icon('M4 2.5l8.5 5.3-3.8 1 2.3 4.1-1.7.9-2.3-4.1-3 2.5z'),
   pen: icon('M10.8 2.7l2.5 2.5-7.9 7.9-3.2.7.7-3.2z M9.6 3.9l2.5 2.5'),
   arrow: icon('M3.5 12.5l8.5-8.5 M6.5 4h5.5v5.5'),
   line: icon('M3.5 12.5l9-9'),
@@ -61,12 +62,53 @@ const ICON = {
 };
 
 const TOOLS: Array<{ id: Tool; glyph: React.ReactNode; name: string }> = [
+  { id: 'select', glyph: ICON.select, name: 'Select: click a mark to move or delete it' },
   { id: 'pen', glyph: ICON.pen, name: 'Draw freehand' },
   { id: 'arrow', glyph: ICON.arrow, name: 'Point at something' },
   { id: 'line', glyph: ICON.line, name: 'Draw a line' },
   { id: 'box', glyph: ICON.box, name: 'Box it' },
   { id: 'text', glyph: ICON.text, name: 'Add a label' },
 ];
+
+/** Stroke widths, as multiples of the width that suits the picture's size (width() below). */
+const WEIGHTS = [
+  { id: 0.5, name: 'Thin' },
+  { id: 1, name: 'Medium' },
+  { id: 2, name: 'Thick' },
+  { id: 3.5, name: 'Heavy' },
+];
+
+/** The selectable marks: everything but labels, which are DOM objects with their own handles. */
+type Shape = Stroke | Arrow | Line | Box;
+const pointsOf = (m: Shape): Array<[number, number]> => (m.tool === 'pen' ? m.points : [m.from, m.to]);
+const bounds = (m: Shape) => {
+  const xs = pointsOf(m).map((p) => p[0]);
+  const ys = pointsOf(m).map((p) => p[1]);
+  return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) };
+};
+const toSegment = (p: [number, number], a: [number, number], b: [number, number]) => {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const len = dx * dx + dy * dy;
+  const t = len ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / len)) : 0;
+  return Math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy));
+};
+/** How far a point is from a mark's ink, in image pixels. */
+const distance = (m: Shape, p: [number, number]): number => {
+  if (m.tool === 'box') {
+    const [a, b] = [m.from, m.to];
+    const corners: Array<[number, number]> = [[a[0], a[1]], [b[0], a[1]], [b[0], b[1]], [a[0], b[1]]];
+    return Math.min(...corners.map((c, i) => toSegment(p, c, corners[(i + 1) % 4]!)));
+  }
+  const pts = pointsOf(m);
+  if (pts.length === 1) return Math.hypot(p[0] - pts[0]![0], p[1] - pts[0]![1]);
+  let best = Infinity;
+  for (let i = 1; i < pts.length; i += 1) best = Math.min(best, toSegment(p, pts[i - 1]!, pts[i]!));
+  return best;
+};
+const moved = (m: Shape, dx: number, dy: number): Shape => (m.tool === 'pen'
+  ? { ...m, points: m.points.map(([x, y]) => [x + dx, y + dy] as [number, number]) }
+  : { ...m, from: [m.from[0] + dx, m.from[1] + dy], to: [m.to[0] + dx, m.to[1] + dy] });
 
 const PIPETTE = (
   <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -145,7 +187,7 @@ function SizeField({ value, onChange, onDone }: {
   const options = [...new Set([...SIZE_PRESETS, value])].sort((a, b) => a - b);
   return (
     <span className="setsize">
-      <label title="Text size, in pixels of the saved image">
+      <label data-tip="Text size, in pixels of the saved image">
         <input
           ref={ref}
           type="number"
@@ -170,7 +212,7 @@ function SizeField({ value, onChange, onDone }: {
         value={String(value)}
         onChange={(e) => onChange(Number(e.target.value))}
         aria-label="Text size presets"
-        title="Pick a size"
+        data-tip="Pick a size"
       >
         {options.map((n) => <option key={n} value={n}>{n} px</option>)}
       </select>
@@ -220,6 +262,7 @@ export function ShotEditor({
     if (!last) return;
     redoRef.current = [...redoRef.current, last];
     setRedoDepth(redoRef.current.length);
+    setSelected(null);
     setMarks((prev) => prev.slice(0, -1));
   }, []);
 
@@ -232,6 +275,7 @@ export function ShotEditor({
   }, []);
 
   const clearAll = () => {
+    setSelected(null);
     redoRef.current = [...redoRef.current, ...marksRef.current];
     setRedoDepth(redoRef.current.length);
     setMarks([]);
@@ -240,12 +284,20 @@ export function ShotEditor({
   // "point at the thing".
   const [tool, setTool] = useState<Tool>('pen');
   const [colourOpen, setColourOpen] = useState(false);
+  const colourOpenRef = useRef(false);
+  colourOpenRef.current = colourOpen;
   /** ⌘ on Apple devices, Ctrl elsewhere, for the tooltips. Decided after mount. */
   const [mod, setMod] = useState('Ctrl+');
   useEffect(() => { if (/Mac|iPad|iPhone|iPod/i.test(navigator.platform)) setMod('⌘'); }, []);
   const redoRef = useRef<Mark[]>([]);
   const [redoDepth, setRedoDepth] = useState(0);
   const [colour, setColour] = useState(COLOURS[0]!.id);
+  const [weight, setWeight] = useState(1);
+  /** The shape picked with the select tool, by its index in marks. */
+  const [selected, setSelected] = useState<number | null>(null);
+  const selectedRef = useRef<number | null>(null);
+  selectedRef.current = selected;
+  const shapeDrag = useRef<{ index: number; last: [number, number] } | null>(null);
   const [drawing, setDrawing] = useState<Mark | null>(null);
   /** The label currently being typed or selected, by id (issue 0014). */
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -399,12 +451,27 @@ export function ShotEditor({
         }
       }
     }
+    // The selected shape, outlined on screen only: never in the saved image.
+    const sel = selectedRef.current === null ? undefined : all[selectedRef.current];
+    if (!withText && sel && sel.tool !== 'text') {
+      const b = bounds(sel);
+      const pad = sel.width + Math.max(6, target.width / 300);
+      ctx.save();
+      ctx.setLineDash([Math.max(4, target.width / 250), Math.max(3, target.width / 400)]);
+      ctx.lineWidth = Math.max(1.5, target.width / 900);
+      ctx.strokeStyle = '#1A1917';
+      ctx.strokeRect(b.x0 - pad, b.y0 - pad, b.x1 - b.x0 + pad * 2, b.y1 - b.y0 + pad * 2);
+      ctx.lineDashOffset = Math.max(4, target.width / 250);
+      ctx.strokeStyle = '#EFEBE2';
+      ctx.strokeRect(b.x0 - pad, b.y0 - pad, b.x1 - b.x0 + pad * 2, b.y1 - b.y0 + pad * 2);
+      ctx.restore()
+    }
   };
 
   useEffect(() => {
     const c = canvasRef.current;
     if (c && ready) paint(c, drawing ? [...marks, drawing] : marks, false);
-  }, [marks, drawing, ready]);
+  }, [marks, drawing, ready, selected]);
 
   /** Pointer position in image pixels, whatever size the canvas is displayed at. */
   const at = (e: React.PointerEvent | React.MouseEvent): [number, number] => {
@@ -416,7 +483,9 @@ export function ShotEditor({
     ];
   };
 
-  const width = () => Math.max(3, Math.round((canvasRef.current?.width ?? 1400) / 420));
+  /** The picture's natural stroke width, times the chosen weight. */
+  const baseWidth = () => Math.max(3, Math.round((canvasRef.current?.width ?? 1400) / 420));
+  const width = () => Math.max(1, Math.round(baseWidth() * weight));
   /** Base size scales with the image so a label reads the same on any capture. */
   const baseSize = () => Math.max(14, Math.round((canvasRef.current?.width ?? 1400) / 58));
   const penSize = () => textSize ?? baseSize();
@@ -448,6 +517,22 @@ export function ShotEditor({
     if (editingId) stopEditing();
     setActiveId(null);
     const p = at(e);
+    if (tool === 'select') {
+      // The nearest shape within reach of the pointer, newest first; empty space deselects.
+      const reach = Math.max(8, baseWidth() * 3);
+      let hit: number | null = null;
+      for (let i = marksRef.current.length - 1; i >= 0; i -= 1) {
+        const m = marksRef.current[i]!;
+        if (m.tool !== 'text' && distance(m, p) <= reach + m.width / 2) { hit = i; break; }
+      }
+      setSelected(hit);
+      if (hit !== null) {
+        shapeDrag.current = { index: hit, last: p };
+        try { (e.target as Element).setPointerCapture(e.pointerId); } catch { /* already released */ }
+      }
+      return;
+    }
+    setSelected(null);
     if (tool === 'text') {
       // Stops the browser moving focus out of the field we are about to create.
       e.preventDefault();
@@ -467,6 +552,14 @@ export function ShotEditor({
   };
 
   const move = (e: React.PointerEvent) => {
+    const sd = shapeDrag.current;
+    if (sd) {
+      const p = at(e);
+      const [dx, dy] = [p[0] - sd.last[0], p[1] - sd.last[1]];
+      sd.last = p;
+      setMarks((prev) => prev.map((m, i) => (i === sd.index && m.tool !== 'text' ? moved(m, dx, dy) : m)));
+      return;
+    }
     const d = dragRef.current;
     if (d) {
       const p = at(e);
@@ -481,6 +574,7 @@ export function ShotEditor({
   };
 
   const up = () => {
+    if (shapeDrag.current) { shapeDrag.current = null; return; }
     if (dragRef.current) { dragRef.current = null; return; }
     if (!drawing) return;
     addMark(drawing);
@@ -555,12 +649,21 @@ export function ShotEditor({
           e.target.blur();
           return;
         }
+        if (colourOpenRef.current) { setColourOpen(false); return; }
         if (inText || editingId) { stopEditing(); return; }
         if (activeIdRef.current) { setActiveId(null); return; }
+        if (selectedRef.current !== null) { setSelected(null); return; }
         onCancel();
         return;
       }
       if (inText) return;
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedRef.current !== null) {
+        e.preventDefault();
+        const gone = selectedRef.current;
+        setSelected(null);
+        setMarks((prev) => prev.filter((_, i) => i !== gone));
+        return;
+      }
       if (isUndo(e)) { e.preventDefault(); undo(); }
       else if (isRedo(e)) { e.preventDefault(); redo(); }
     };
@@ -605,7 +708,7 @@ export function ShotEditor({
           style={{ background: c.id }}
           onClick={() => pick(c.id)}
           aria-pressed={sameColour(c.id, value)}
-          title={c.name}
+          data-tip={c.name}
           aria-label={c.name}
         />
       ))}
@@ -614,15 +717,15 @@ export function ShotEditor({
         className={`swatch any${COLOURS.some((c) => sameColour(c.id, value)) ? '' : ' on'}`}
         value={hex6(value)}
         onChange={(e) => pick(e.target.value)}
-        title="Any colour"
-        aria-label="Any colour"
+        data-tip="Any color"
+        aria-label="Any color"
       />
       {canPick && (
         <button
           className="setpipette"
           onClick={() => pickFromScreen(pick)}
-          title="Copy a colour from the screenshot"
-          aria-label="Copy a colour from the screenshot"
+          data-tip="Copy a color from the screenshot"
+          aria-label="Copy a color from the screenshot"
         >
           {PIPETTE}
         </button>
@@ -651,7 +754,7 @@ export function ShotEditor({
                   key={t.id}
                   type="button"
                   className={`seticon${t.id === tool ? ' on' : ''}`}
-                  onClick={() => { stopEditing(); setTool(t.id); }}
+                  onClick={() => { stopEditing(); setSelected(null); setTool(t.id); }}
                   aria-pressed={t.id === tool}
                   aria-label={t.name}
                   data-tip={t.name}
@@ -661,20 +764,51 @@ export function ShotEditor({
               ))}
             </div>
             <span className="setdiv" aria-hidden />
-            <div className="setcols" role="group" aria-label="Colour">
+            {/* Color and stroke width share one button and one popover: two more buttons would not
+                fit the row on a phone. The button shows both, the dot in the color at the width. */}
+            <div className="setcols" role="group" aria-label="Color and stroke width">
               <button
                 type="button"
                 className="seticon setcolour"
                 onClick={() => setColourOpen((v) => !v)}
                 aria-expanded={colourOpen}
-                aria-label={`Colour: ${COLOURS.find((x) => sameColour(x.id, colour))?.name ?? hex6(colour)}`}
-                data-tip="Colour"
+                aria-label={`Color and stroke width: ${COLOURS.find((x) => sameColour(x.id, colour))?.name ?? hex6(colour)}, ${WEIGHTS.find((w) => w.id === weight)?.name ?? ''}`}
+                data-tip="Color and stroke width"
               >
                 <span className="setdot" style={{ background: colour }} />
+                <span className="setdotweight" style={{ height: `${Math.max(1.5, weight * 2)}px`, background: colour }} />
               </button>
               {colourOpen && (
-                <div className="setcolpop" role="group" aria-label="Pick a colour">
-                  {colourPicks(colour, (next) => { setColour(next); setColourOpen(false); })}
+                <div className="setcolpop setcolgrid" role="group" aria-label="Pick a color and a stroke width">
+                  <div className="setcolrow" role="group" aria-label="Color">
+                    {colourPicks(colour, (next) => {
+                      setColour(next);
+                      // A selected shape takes the new color too.
+                      if (selected !== null) setMarks((prev) => prev.map((m, i) => (i === selected ? { ...m, colour: next } : m)));
+                    })}
+                  </div>
+                  <div className="setcolrow" role="group" aria-label="Stroke width">
+                    {WEIGHTS.map((w) => (
+                      <button
+                        key={w.id}
+                        type="button"
+                        className={`setweightpick${w.id === weight ? ' on' : ''}`}
+                        aria-pressed={w.id === weight}
+                        aria-label={`${w.name} stroke`}
+                        data-tip={`${w.name} stroke`}
+                        onClick={() => {
+                          setWeight(w.id);
+                          // A selected shape takes the new width too.
+                          if (selected !== null) {
+                            const next = Math.max(1, Math.round(baseWidth() * w.id));
+                            setMarks((prev) => prev.map((m, i) => (i === selected && m.tool !== 'text' ? { ...m, width: next } : m)));
+                          }
+                        }}
+                      >
+                        <span className="setweight" style={{ height: `${Math.max(1.5, w.id * 2.5)}px`, background: colour }} />
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -816,7 +950,7 @@ export function ShotEditor({
                   className={active.bold ? 'on' : ''}
                   onClick={() => { const b = !active.bold; setBold(b); patch(active.id, { bold: b }); }}
                   aria-pressed={active.bold}
-                  title="Bold"
+                  data-tip="Bold"
                   style={{ fontWeight: 700 }}
                 >
                   B
@@ -825,11 +959,11 @@ export function ShotEditor({
                 {colourPicks(active.colour, (next) => { setColour(next); patch(active.id, { colour: next }); })}
                 <span className="sep" />
                 {editingId === active.id ? (
-                  <button onClick={stopEditing} title="Keep it and stop typing">Done</button>
+                  <button onClick={stopEditing} data-tip="Keep it and stop typing">Done</button>
                 ) : (
-                  <button onClick={() => setEditingId(active.id)} title="Type in it again">Edit</button>
+                  <button onClick={() => setEditingId(active.id)} data-tip="Type in it again">Edit</button>
                 )}
-                <button onClick={() => dropLabel(active.id)} title="Delete this label" aria-label="Delete this label">×</button>
+                <button onClick={() => dropLabel(active.id)} data-tip="Delete this label" aria-label="Delete this label">×</button>
               </div>
             )}
           </div>
@@ -838,6 +972,8 @@ export function ShotEditor({
 
       <p className="setnote">
         {marks.length} mark{marks.length === 1 ? '' : 's'} · <b>{mod}Z</b> undo · <b>{mod}⇧Z</b> redo ·{' '}
+        the arrow tool selects a mark: drag it to move it, <b>Delete</b> removes it, and a color or
+        stroke width picked while it is selected applies to it ·{' '}
         <b>Esc</b> leaves the text field, then the selection, then the editor. A label widens as
         you type until it reaches the edge of the picture, then wraps; drag it to move it, drag its
         corner to set its size, double-click to retype it. <b>Return</b> inside one is a line

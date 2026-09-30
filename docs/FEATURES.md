@@ -150,15 +150,21 @@ unsupported, or it took too long. Everything else still files."
 
 **Annotate** opens a full-screen editor over the picture:
 
-- Tools: freehand pen (the default), arrow, line, box, and text label.
-- Five colours (clay, green, purple, ink, white), a colour picker, and an eyedropper where the browser
-  has one (Chromium's `EyeDropper`; the button is not drawn elsewhere).
+- Tools: select, freehand pen (the default), arrow, line, box, and text label.
+- **Select** (the pointer) is also the way out of another tool. Click a mark to select it (a dashed
+  outline, never saved); drag to move it; **Delete** or **Backspace** removes it; a color or stroke
+  width picked while it is selected applies to it. Esc deselects.
+- One **Color and stroke width** button: five colors (clay, green, purple, ink, white), a color
+  picker, an eyedropper where the browser has one (Chromium's `EyeDropper`; the button is not drawn
+  elsewhere), and four stroke widths (thin, medium, thick, heavy) for the pen, lines, arrows and
+  boxes. They share a button so the row still fits a phone.
 - Text labels are real elements while editing: type (Return is a new line), drag to move, drag the
   corner to set a wrap width, double-click to retype. Size is in pixels of the saved image, 8–400,
   typed or picked from presets. Bold on by default.
 - Undo (⌘Z), Redo (⌘⇧Z or ⌘Y), Clear, Cancel and Done. A status line counts the marks.
 - **The toolbar is one row of icon buttons** (a kit change; PL LabOS tools used words). Each has an
-  accessible name and a tooltip with its shortcut, shown on hover and keyboard focus; the active tool
+  accessible name and a dark tooltip with its shortcut, shown on hover and keyboard focus and always
+  drawn above the picture; the active tool
   is marked as well as announced (`aria-pressed`). On a phone the row fits the screen with 44 px
   targets.
 
