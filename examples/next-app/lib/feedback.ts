@@ -8,7 +8,7 @@
  */
 import { join, resolve } from 'node:path';
 import { createFeedbackHandler, fileStore, startIngester, type FeedbackHandler, type FeedbackStore } from '@jbenet/feedback-server';
-import { githubStore } from '@jbenet/feedback-server/github';
+import { githubStore, type GitHubAttachments } from '@jbenet/feedback-server/github';
 import { userFromCookieHeader } from './users';
 
 // Data lives outside the build; tell Turbopack's file tracing not to follow these paths.
@@ -55,9 +55,31 @@ function makeStore(): FeedbackStore {
     destination: `GitHub issues in ${repo}, mirrored in ${shownRoot}/github`,
     dir: githubDir,
     label: process.env.FEEDBACK_GITHUB_LABEL || undefined,
-    // Pictures stay on this server; the issue links to them through this app's own (signed-in) route.
-    attachments: { mode: 'local', baseUrl: `${appUrl()}/api/issues` },
+    attachments: githubPictures(repo),
   });
+}
+
+/**
+ * Where screenshots go, from FEEDBACK_GITHUB_PICTURES:
+ *   link (default)  they stay on this server; the issue links to them at FEEDBACK_APP_URL, behind the sign-in
+ *   upload          committed to FEEDBACK_GITHUB_PICTURES_REPO (default: the issues repository) on the branch
+ *                   FEEDBACK_GITHUB_PICTURES_BRANCH (default feedback-pictures, made on first use), and shown
+ *                   in the issue. A public repository is refused unless FEEDBACK_GITHUB_PICTURES_PUBLIC=1.
+ *   none            they stay on this server; the issue says how many there are
+ */
+function githubPictures(repo: string): GitHubAttachments {
+  const mode = process.env.FEEDBACK_GITHUB_PICTURES || 'link';
+  if (mode === 'none') return { mode: 'none' };
+  if (mode === 'upload') {
+    return {
+      mode: 'repo',
+      repo: process.env.FEEDBACK_GITHUB_PICTURES_REPO || repo,
+      branch: process.env.FEEDBACK_GITHUB_PICTURES_BRANCH || 'feedback-pictures',
+      allowPublic: process.env.FEEDBACK_GITHUB_PICTURES_PUBLIC === '1',
+    };
+  }
+  if (mode !== 'link') console.warn(`[feedback] FEEDBACK_GITHUB_PICTURES=${mode} is not link, upload or none; using link.`);
+  return { mode: 'local', baseUrl: `${appUrl()}/api/issues` };
 }
 
 /** Where readers of a GitHub issue reach this app, for the picture links. */

@@ -28,7 +28,11 @@ import { attachmentNames, fileStore, isoNow, padId, readAttachmentFrom, rewriteT
 export type GitHubAttachments =
   /** Pictures stay on this server. With `baseUrl`, the issue links to them (behind your app's own auth). */
   | { mode: 'local'; baseUrl?: string }
-  /** Uploaded to a private repository's contents under `path/<clientId>/`. */
+  /**
+   * Uploaded to a private repository's contents under `path/<clientId>/`. A `branch` that does not
+   * exist yet is created with no history of its own (just a README), so the pictures stay off your
+   * code's branches.
+   */
   | { mode: 'repo'; repo: string; branch?: string; path?: string; allowPublic?: boolean }
   /** Pictures stay on this server and the issue only says how many there are. */
   | { mode: 'none' };
@@ -169,6 +173,27 @@ export function githubStore(options: GitHubStoreOptions): FeedbackStore & { file
     return assetsPrivate;
   }
 
+  /**
+   * The pictures' branch, made on first use with no parent: one commit holding a README, so it shares
+   * nothing with the repository's code. False when the branch was there after all (the 404 meant
+   * something else, which the retried upload reports).
+   */
+  async function makeAssetsBranch(repo: string, branch: string): Promise<boolean> {
+    const exists = await gh('GET', `/repos/${repo}/git/ref/heads/${encodeURIComponent(branch)}`);
+    if (exists.status === 200) return false;
+    const readme = `# ${branch}\n\nScreenshots and pictures attached to feedback issues, uploaded by feedback-kit.\nNot code: never merge this branch.\n`;
+    const tree = ok(await gh<{ sha: string }>('POST', `/repos/${repo}/git/trees`, {
+      tree: [{ path: 'README.md', mode: '100644', type: 'blob', content: readme }],
+    }), 'pictures branch tree');
+    const commit = ok(await gh<{ sha: string }>('POST', `/repos/${repo}/git/commits`, {
+      message: 'feedback-kit: pictures branch', tree: tree.sha, parents: [],
+    }), 'pictures branch commit');
+    const ref = await gh('POST', `/repos/${repo}/git/refs`, { ref: `refs/heads/${branch}`, sha: commit.sha });
+    // 422: another process made it a moment ago.
+    if (ref.status !== 422) ok(ref, 'pictures branch');
+    return true;
+  }
+
   /** Where each picture is linked from the GitHub issue, in token order; null when it is not linked. */
   async function pictureLinks(draft: IssueDraft, clientId: string, localPaths: string[]): Promise<Array<string | null>> {
     const atts = draft.attachments ?? [];
@@ -181,11 +206,13 @@ export function githubStore(options: GitHubStoreOptions): FeedbackStore & { file
         // A dropped image the body no longer points at stays local: only what the report shows leaves.
         if (atts[i]!.kind === 'image' && !referenced.has(i)) { links.push(null); continue; }
         const file = `${base}/${clientId}/${localPaths[i]!.split('/').pop()}`;
-        const put = await gh<{ content?: { html_url?: string } }>('PUT', `/repos/${pictures.repo}/contents/${file.split('/').map(encodeURIComponent).join('/')}`, {
+        const upload = () => gh<{ content?: { html_url?: string } }>('PUT', `/repos/${pictures.repo}/contents/${file.split('/').map(encodeURIComponent).join('/')}`, {
           message: `feedback-kit: picture for ${clientId}`,
           content: Buffer.from(atts[i]!.bytes).toString('base64'),
           ...(pictures.branch ? { branch: pictures.branch } : {}),
         });
+        let put = await upload();
+        if (put.status === 404 && pictures.branch && await makeAssetsBranch(pictures.repo, pictures.branch)) put = await upload();
         // 422 here means the file is already there: a retry after an upload that did land. Same bytes.
         if (put.status !== 422) ok(put, 'picture upload');
         links.push(`https://github.com/${pictures.repo}/blob/${pictures.branch ?? 'HEAD'}/${file}?raw=true`);

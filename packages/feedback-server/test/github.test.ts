@@ -15,6 +15,7 @@ function fakeGitHub(opts: { assetsPrivate?: boolean } = {}) {
   const issues: FakeIssue[] = [];
   const labels = new Set<string>();
   const contents = new Map<string, string>();
+  const branches = new Set(['main']);
   const log: Array<{ method: string; path: string; body?: Record<string, unknown> }> = [];
   let tick = Date.parse('2026-09-29T12:00:00Z');
   const stamp = () => new Date((tick += 1000)).toISOString();
@@ -71,7 +72,20 @@ function fakeGitHub(opts: { assetsPrivate?: boolean } = {}) {
       }
       return reply(200, issue);
     }
+    if (method === 'GET' && (m = /^\/repos\/acme\/assets\/git\/ref\/heads\/(.+)$/.exec(p))) {
+      return branches.has(decodeURIComponent(m[1]!)) ? reply(200, { ref: m[1] }) : reply(404, { message: 'Not Found' });
+    }
+    if (method === 'POST' && p === '/repos/acme/assets/git/trees') return reply(201, { sha: 'tree1' });
+    if (method === 'POST' && p === '/repos/acme/assets/git/commits') {
+      assert.deepEqual(body!.parents, []);
+      return reply(201, { sha: 'commit1' });
+    }
+    if (method === 'POST' && p === '/repos/acme/assets/git/refs') {
+      branches.add((body!.ref as string).replace('refs/heads/', ''));
+      return reply(201, { ref: body!.ref });
+    }
     if (method === 'PUT' && (m = /^\/repos\/acme\/assets\/contents\/(.+)$/.exec(p))) {
+      if (body!.branch && !branches.has(body!.branch as string)) return reply(404, { message: `Branch ${body!.branch} not found` });
       const path = decodeURIComponent(m[1]!);
       if (contents.has(path)) return reply(422, { message: 'Invalid request. "sha" wasn\'t supplied.' });
       contents.set(path, body!.content as string);
@@ -79,7 +93,7 @@ function fakeGitHub(opts: { assetsPrivate?: boolean } = {}) {
     }
     return reply(404, { message: `fake: no route for ${method} ${p}` });
   };
-  return { fetch, issues, labels, contents, log, limit: (l: typeof limitNext) => { limitNext = l; }, stamp };
+  return { fetch, issues, labels, contents, branches, log, limit: (l: typeof limitNext) => { limitNext = l; }, stamp };
 }
 
 const draft = (overrides: Partial<IssueDraft> = {}): IssueDraft => ({
@@ -259,4 +273,17 @@ test('a token function is asked on each request, so a token that arrives later (
   current = 'invented-token';
   const issue = await store.create(draft());
   assert.equal(issue.id, '0001');
+});
+
+test('repo mode makes a missing pictures branch once, with no parent, then uploads to it', async (t) => {
+  const dir = await tempDir(t);
+  const gh = fakeGitHub({ assetsPrivate: true });
+  const store = base(dir, gh, { attachments: { mode: 'repo', repo: 'acme/assets', branch: 'feedback-pictures' } });
+  const d = draft();
+  await store.create(d);
+  assert.ok(gh.branches.has('feedback-pictures'));
+  assert.equal(gh.contents.size, 2);
+  assert.match(gh.issues[0]!.body, /acme\/assets\/blob\/feedback-pictures\/feedback\/.+\/report-screenshot\.png\?raw=true/);
+  await store.create(draft({ clientId: id() }));
+  assert.equal(gh.log.filter((r) => r.path === '/repos/acme/assets/git/refs').length, 1);
 });

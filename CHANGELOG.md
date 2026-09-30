@@ -6,11 +6,14 @@ Both packages share one version.
 
 - **GitHub issue filing in the example.** Set `FEEDBACK_GITHUB_REPO=owner/name` and the example files
   reports as GitHub issues (`githubStore`) instead of markdown files, mirrored in `.data/github`, with
-  pictures kept on the server and linked from the issue. The token is `FEEDBACK_GITHUB_TOKEN` (a
+  pictures linked from this server (`FEEDBACK_GITHUB_PICTURES=link`, the default), uploaded to a
+  GitHub branch and shown in the issue (`upload`), or only counted (`none`). The token is `FEEDBACK_GITHUB_TOKEN` (a
   fine-grained token for that one repository, Issues read/write). `FEEDBACK_GITHUB_LABEL` changes the
   base label (default `feedback`); `FEEDBACK_APP_URL` the address the picture links use.
 - `githubStore`: `token` may be a function, asked before each request; `destination` sets the sentence
   the issues pages show.
+- `githubStore` `repo` pictures: a `branch` that does not exist is created on first use, with no parent
+  (one README commit), so pictures never share history with the code.
 - `githubStore` sync: an issue reopened on GitHub comes back as open. GitHub keeps the `status:done`
   label on reopen, and sync used to read it and leave the mirror at done.
 
