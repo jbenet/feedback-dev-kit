@@ -78,7 +78,7 @@ screenshot.
 
 ## 3. The automatic screenshot
 
-![The screenshots column: one automatic capture, labelled "Drawn from the page", with Misaligned? Tell us](screenshots/04-screenshots.png)
+![The screenshots column: one automatic capture, labelled "Automatic capture may not be exact.", with Misaligned? Tell us](screenshots/04-screenshots.png)
 
 When the panel opens, it takes a screenshot of the current viewport by itself: no button, no
 permission prompt. It is a **redraw**: the page's DOM cloned into an SVG `foreignObject` and
@@ -86,7 +86,7 @@ rasterised by the browser (the `modern-screenshot` library). Because it is a red
 things out, and it does: everything marked `nocapture` (the panel, the scrim, the status popover) is
 dropped, so the picture shows the page as it was before the panel covered it.
 
-- It is labelled **Drawn from the page**.
+- It is labelled **Automatic capture may not be exact.**.
 - **Aim: pixel perfect.** In PL LabOS tools it differs from the browser's own screenshot on about 0.05%
   of pixels (anti-aliasing), at the top of a page and scrolled. Getting there took self-hosted
   fonts, a zeroed body margin, sticky and fixed elements moved back to where they are on screen,
@@ -150,15 +150,21 @@ unsupported, or it took too long. Everything else still files."
 
 **Annotate** opens a full-screen editor over the picture:
 
-- Tools: freehand pen (the default), arrow, line, box, and text label.
-- Five colours (clay, green, purple, ink, white), a colour picker, and an eyedropper where the browser
-  has one (Chromium's `EyeDropper`; the button is not drawn elsewhere).
+- Tools: select, freehand pen (the default), arrow, line, box, and text label.
+- **Select** (the pointer) is also the way out of another tool. Click a mark to select it (a dashed
+  outline, never saved); drag to move it; **Delete** or **Backspace** removes it; a color or stroke
+  width picked while it is selected applies to it. Esc deselects.
+- One **Color and stroke width** button: five colors (clay, green, purple, ink, white), a color
+  picker, an eyedropper where the browser has one (Chromium's `EyeDropper`; the button is not drawn
+  elsewhere), and four stroke widths (thin, medium, thick, heavy) for the pen, lines, arrows and
+  boxes. They share a button so the row still fits a phone.
 - Text labels are real elements while editing: type (Return is a new line), drag to move, drag the
   corner to set a wrap width, double-click to retype. Size is in pixels of the saved image, 8–400,
   typed or picked from presets. Bold on by default.
 - Undo (⌘Z), Redo (⌘⇧Z or ⌘Y), Clear, Cancel and Done. A status line counts the marks.
 - **The toolbar is one row of icon buttons** (a kit change; PL LabOS tools used words). Each has an
-  accessible name and a tooltip with its shortcut, shown on hover and keyboard focus; the active tool
+  accessible name and a dark tooltip with its shortcut, shown on hover and keyboard focus and always
+  drawn above the picture; the active tool
   is marked as well as announced (`aria-pressed`). On a phone the row fits the screen with 44 px
   targets.
 
@@ -237,7 +243,18 @@ Nothing typed is lost to a reload, a crash or a closed tab.
 
 ## 9. Filing: journaled on the server, outbox in the browser
 
-**File it** (or ⌘/Ctrl+Enter) closes the panel within a fraction of a second. Behind it:
+**File it** (or ⌘/Ctrl+Enter) returns at once: nothing waits on the server. The panel stays open on
+a **filed screen** that says where the report stands: "Sending…", "Saved on the server · being
+filed", "Kept in this browser (reason) · sent again when the server answers", "Refused by the
+server: reason", and **Filed as issue N** once the number is known, with a thank-you line. Three
+buttons: **Give more feedback** (focused; also ⌘/Ctrl+Enter) gives a fresh box on the same page with
+a new automatic screenshot; **Open the issue** links to it once it has a number; **Close** (also
+Esc). From the second report on, a list under them, "Filed while this was open · N", has a row per
+report, linked once numbered.
+
+![The filed screen after two reports in a row](screenshots/23-filed.png)
+
+Behind File:
 
 1. The report goes into this browser's **outbox** (IndexedDB, one record per report, pictures
    included) under a fresh **client id**, the idempotency key.
@@ -298,7 +315,8 @@ kit's line covers feedback only.
 ![The app's keyboard shortcuts list](screenshots/18-shortcuts.png)
 
 - **Alt/Option+F** opens the panel (outside text fields and dialogs).
-- **⌘/Ctrl+Enter** files, from anywhere in the panel, including inside the description.
+- **⌘/Ctrl+Enter** files, from anywhere in the panel, including inside the description. On the filed
+  screen it means **Give more feedback**, never filing again.
 - **Esc** closes the keys panel first, then the panel. An open annotator or region picker takes Esc
   first.
 - **Tab / Shift+Tab** move between fields.

@@ -247,6 +247,9 @@ try {
   await shotCount(page, 1);
   await page.keyboard.type('Week 12 returns for Rye look three times too high in the harbor region.');
   await page.keyboard.press('ControlOrMeta+Enter');
+  // The box stays open on the filed screen; close it to show the rail.
+  await box.locator('.fbfiledhead').waitFor();
+  await page.keyboard.press('Escape');
   await box.waitFor({ state: 'hidden' });
   const chip = page.locator('.obchip');
   await chip.filter({ hasText: 'only on this device' }).waitFor();
@@ -266,6 +269,24 @@ try {
   await list.waitFor();
   await page.waitForTimeout(300);
   await page.screenshot({ path: out('14-status.png'), clip: await around(page, [chip, list.locator('.obpanel').or(list)], 12) });
+  await page.keyboard.press('Escape');
+
+  // ── The filed screen: two reports in a row without closing the box ─────────────────────
+  // On a page with no draft left from the shots above.
+  await page.goto('/settings');
+  box = await openBox(page);
+  await shotCount(page, 1);
+  await page.keyboard.type('The delivery radius field accepts negative numbers.');
+  await page.keyboard.press('ControlOrMeta+Enter');
+  await box.locator('.fbfiledhead').filter({ hasText: /Filed as issue \d+/ }).waitFor({ timeout: 30_000 });
+  await page.keyboard.press('ControlOrMeta+Enter');
+  await shotCount(page, 1);
+  await box.getByRole('textbox', { name: 'Enter any feedback' }).focus();
+  await page.keyboard.type('Could the opening hours be set per day of the week?');
+  await page.keyboard.press('ControlOrMeta+Enter');
+  await box.locator('.fbfiledlist a').nth(1).waitFor({ timeout: 30_000 });
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: out('23-filed.png') });
   await page.keyboard.press('Escape');
 
   // ── The issues pages ──────────────────────────────────────────────────────────────────

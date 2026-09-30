@@ -15,6 +15,7 @@ function fakeGitHub(opts: { assetsPrivate?: boolean } = {}) {
   const issues: FakeIssue[] = [];
   const labels = new Set<string>();
   const contents = new Map<string, string>();
+  const branches = new Set(['main']);
   const log: Array<{ method: string; path: string; body?: Record<string, unknown> }> = [];
   let tick = Date.parse('2026-09-29T12:00:00Z');
   const stamp = () => new Date((tick += 1000)).toISOString();
@@ -71,7 +72,20 @@ function fakeGitHub(opts: { assetsPrivate?: boolean } = {}) {
       }
       return reply(200, issue);
     }
+    if (method === 'GET' && (m = /^\/repos\/acme\/assets\/git\/ref\/heads\/(.+)$/.exec(p))) {
+      return branches.has(decodeURIComponent(m[1]!)) ? reply(200, { ref: m[1] }) : reply(404, { message: 'Not Found' });
+    }
+    if (method === 'POST' && p === '/repos/acme/assets/git/trees') return reply(201, { sha: 'tree1' });
+    if (method === 'POST' && p === '/repos/acme/assets/git/commits') {
+      assert.deepEqual(body!.parents, []);
+      return reply(201, { sha: 'commit1' });
+    }
+    if (method === 'POST' && p === '/repos/acme/assets/git/refs') {
+      branches.add((body!.ref as string).replace('refs/heads/', ''));
+      return reply(201, { ref: body!.ref });
+    }
     if (method === 'PUT' && (m = /^\/repos\/acme\/assets\/contents\/(.+)$/.exec(p))) {
+      if (body!.branch && !branches.has(body!.branch as string)) return reply(404, { message: `Branch ${body!.branch} not found` });
       const path = decodeURIComponent(m[1]!);
       if (contents.has(path)) return reply(422, { message: 'Invalid request. "sha" wasn\'t supplied.' });
       contents.set(path, body!.content as string);
@@ -79,7 +93,7 @@ function fakeGitHub(opts: { assetsPrivate?: boolean } = {}) {
     }
     return reply(404, { message: `fake: no route for ${method} ${p}` });
   };
-  return { fetch, issues, labels, contents, log, limit: (l: typeof limitNext) => { limitNext = l; }, stamp };
+  return { fetch, issues, labels, contents, branches, log, limit: (l: typeof limitNext) => { limitNext = l; }, stamp };
 }
 
 const draft = (overrides: Partial<IssueDraft> = {}): IssueDraft => ({
@@ -161,9 +175,9 @@ test('rate limits: a short wait is taken inline (measured against GitHub\'s cloc
   assert.equal(rateLimitWait(new Headers({ 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '1', date: new Date().toUTCString() })), 1_000);
 });
 
-test('repo mode uploads only pictures the report shows, to a private repository; a public one keeps them local', async (t) => {
+test('repo mode uploads only pictures the report shows; none keeps them all local', async (t) => {
   const dir = await tempDir(t);
-  const gh = fakeGitHub({ assetsPrivate: true });
+  const gh = fakeGitHub();
   const store = base(dir, gh, { attachments: { mode: 'repo', repo: 'acme/assets', path: 'feedback', branch: 'main' } });
   const d = draft();
   await store.create(d);
@@ -171,17 +185,6 @@ test('repo mode uploads only pictures the report shows, to a private repository;
     `feedback/${d.clientId}/report-image-1.png`, `feedback/${d.clientId}/report-screenshot.png`,
   ]);
   assert.match(gh.issues[0]!.body, /https:\/\/github\.com\/acme\/assets\/blob\/main\/feedback\/.+\/report-screenshot\.png\?raw=true/);
-
-  const dir2 = await tempDir(t);
-  const pub = fakeGitHub({ assetsPrivate: false });
-  const warn = console.warn;
-  console.warn = () => undefined;
-  t.after(() => { console.warn = warn; });
-  const store2 = base(dir2, pub, { attachments: { mode: 'repo', repo: 'acme/assets' } });
-  await store2.create(draft());
-  assert.equal(pub.contents.size, 0);
-  assert.match(pub.issues[0]!.body, /kept on the server/);
-  assert.doesNotMatch(pub.issues[0]!.body, /!\[Screenshot\]/);
 
   const dir3 = await tempDir(t);
   const none = fakeGitHub();
@@ -213,10 +216,10 @@ test('status out (labels, close) and back in (sync, by GitHub\'s own timestamps)
   assert.equal(gh.issues[0]!.state, 'closed');
   assert.deepEqual(gh.issues[0]!.labels.map((l) => l.name).sort(), ['feedback', 'kind:bug', 'needs-design', 'priority:P1', 'status:done']);
 
-  // Changes made on GitHub: 0002 closed, 0003 labelled triaged, 0001 reopened.
+  // Changes made on GitHub: 0002 closed, 0003 labelled triaged, 0001 reopened (GitHub keeps its status:done label).
   gh.issues[1]!.state = 'closed'; gh.issues[1]!.updated_at = gh.stamp();
   gh.issues[2]!.labels = gh.issues[2]!.labels.filter((l) => !l.name.startsWith('status:')).concat({ name: 'status:triaged' }); gh.issues[2]!.updated_at = gh.stamp();
-  gh.issues[0]!.state = 'open'; gh.issues[0]!.labels = gh.issues[0]!.labels.filter((l) => l.name !== 'status:done'); gh.issues[0]!.updated_at = gh.stamp();
+  gh.issues[0]!.state = 'open'; gh.issues[0]!.updated_at = gh.stamp();
   const synced = await store.sync();
   assert.equal(synced.updated, 3);
   assert.equal((await store.get('0001'))?.status, 'open');
@@ -240,4 +243,51 @@ test('no token: the create fails (and is retried by the ingester), never silentl
   });
   const store = githubStore({ repo: 'acme/app', dir, fetch: (async () => { throw new Error('must not be called'); }) as typeof fetch });
   await assert.rejects(store.create(draft()), /No GitHub token/);
+});
+
+test('a token function is asked on each request, so a token that arrives later (or rotates) is used', async (t) => {
+  const dir = await tempDir(t);
+  const saved = [process.env.FEEDBACK_GITHUB_TOKEN, process.env.GITHUB_TOKEN];
+  delete process.env.FEEDBACK_GITHUB_TOKEN;
+  delete process.env.GITHUB_TOKEN;
+  t.after(() => {
+    if (saved[0] !== undefined) process.env.FEEDBACK_GITHUB_TOKEN = saved[0];
+    if (saved[1] !== undefined) process.env.GITHUB_TOKEN = saved[1];
+  });
+  const gh = fakeGitHub();
+  let current: string | undefined;
+  const store = base(dir, gh, { token: () => current });
+  await assert.rejects(store.create(draft()), /No GitHub token/);
+  assert.equal(gh.log.length, 0);
+  current = 'invented-token';
+  const issue = await store.create(draft());
+  assert.equal(issue.id, '0001');
+});
+
+test('repo mode makes a missing pictures branch once, with no parent, then uploads to it', async (t) => {
+  const dir = await tempDir(t);
+  const gh = fakeGitHub();
+  const store = base(dir, gh, { attachments: { mode: 'repo', repo: 'acme/assets', branch: 'feedback-pictures' } });
+  const d = draft();
+  await store.create(d);
+  assert.ok(gh.branches.has('feedback-pictures'));
+  assert.equal(gh.contents.size, 2);
+  assert.match(gh.issues[0]!.body, /acme\/assets\/blob\/feedback-pictures\/feedback\/.+\/report-screenshot\.png\?raw=true/);
+  await store.create(draft({ clientId: id() }));
+  assert.equal(gh.log.filter((r) => r.path === '/repos/acme/assets/git/refs').length, 1);
+});
+
+test('custom mode hands each picture the report shows to your transport and embeds the URL it returns', async (t) => {
+  const dir = await tempDir(t);
+  const gh = fakeGitHub();
+  const sent: string[] = [];
+  const store = base(dir, gh, { attachments: { mode: 'custom', upload: async (p: { name: string; kind: string; bytes: Uint8Array }) => {
+    assert.ok(p.bytes.length > 0);
+    sent.push(`${p.kind}:${p.name}`);
+    return p.kind === 'screenshot' ? `https://cdn.test/${p.name}` : null;
+  } } });
+  await store.create(draft());
+  assert.deepEqual(sent, ['screenshot:report-screenshot.png', 'image:report-image-1.png']);
+  assert.match(gh.issues[0]!.body, /!\[Screenshot\]\(https:\/\/cdn\.test\/report-screenshot\.png\)/);
+  assert.match(gh.issues[0]!.body, /kept on the server/);
 });

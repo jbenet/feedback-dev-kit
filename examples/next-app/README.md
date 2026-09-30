@@ -17,6 +17,35 @@ Reports are journaled under `FEEDBACK_DATA` (default `.data/`, git-ignored) and 
 `FEEDBACK_DATA/issues`. Titles are the report's first sentence here (`generateTitle: null`, no model is
 called).
 
+**File to GitHub instead.** With `FEEDBACK_GITHUB_REPO` set, reports become GitHub issues in that
+repository (the server package's `githubStore`), mirrored locally in `FEEDBACK_DATA/github`, which the
+issues pages read. Give the server a token in `FEEDBACK_GITHUB_TOKEN`: a
+[fine-grained personal access token](https://github.com/settings/personal-access-tokens/new) limited
+to that one repository, with **Issues: read and write** and nothing else (Metadata: read is added
+automatically). The report text, page and captured context go to GitHub.
+
+`FEEDBACK_GITHUB_PICTURES` says where screenshots and dropped images go:
+
+| Value | Pictures | The token also needs |
+|---|---|---|
+| `link` (default) | Stay on this server. The issue links to them at `FEEDBACK_APP_URL` (default `http://localhost:$PORT`), behind the app's sign-in, so they show only to people who can reach and sign in to the app. | nothing |
+| `upload` | Committed to `FEEDBACK_GITHUB_PICTURES_REPO` (default: the issues repository) on the branch `FEEDBACK_GITHUB_PICTURES_BRANCH` (default `feedback-pictures`, created on first use with no shared history), and shown inline in the issue. | **Contents: read and write** on that repository |
+| `none` | Stay on this server; the issue says how many there are. | nothing |
+
+To get pictures to GitHub some other way (your own bucket or CDN, a release asset), use the store's
+`custom` mode: see "Getting pictures to GitHub another way" in
+[the server package's README](../../packages/feedback-server/README.md#files--github-issues).
+An uploaded picture stays in that branch's git history after the issue is closed. Upload only from
+apps whose screens carry nothing confidential, and to a private repository when you can.
+
+```sh
+FEEDBACK_GITHUB_REPO=owner/name FEEDBACK_GITHUB_TOKEN=github_pat_… FEEDBACK_GITHUB_PICTURES=upload npm run dev
+```
+
+`FEEDBACK_GITHUB_LABEL` replaces the base `feedback` label (useful to keep test issues apart); every
+issue also gets `kind:*`, `priority:*` and `status:*`. Status changes on the issues page relabel or
+close the GitHub issue, and changes made on GitHub come back within a minute.
+
 **Sign in as.** The rail has a demo "Sign in as" (Robin Vega or Sam Okafor, both invented). It sets a
 `demo_user` cookie that the server reads to name the reporter (`resolveReporter`) and to open the issue
 reads, pictures and status changes (`authorize`). Signed out, the issues pages and their API answer 401,
@@ -27,7 +56,7 @@ real app supplies both hooks from its own session.
   and the sign-in.
 - `components/Providers.tsx`: `FeedbackProvider` with the router's pathname and the user's name.
 - `lib/feedback.ts`: the server: `createFeedbackHandler` (with `resolveReporter` and `authorize`),
-  `startIngester`, `fileStore`. `lib/users.ts`: the demo sign-in.
+  `startIngester`, `fileStore` or `githubStore`. `lib/users.ts`: the demo sign-in.
 - `app/api/feedback/[[...path]]`: every feedback endpoint; `app/api/issues/[[...path]]`: the issues reads
   (both through `nextRoutes`). `instrumentation.ts` starts the ingester with the server.
 - `app/issues`: the list (data from the store, on the server) and the detail (fetched by the component).

@@ -189,11 +189,11 @@ each priority's meaning is in its own `<option>`, not a paragraph, the failure b
 
 Each thumbnail: a button containing the image (`max-height: 190px; object-fit: cover; object-position:
 top`) that opens the annotator, an overlay bar with **✎ Annotate** and **×**
-(`aria-label="Remove screenshot N"`), and a meta row: the method label (`Drawn from the page` /
+(`aria-label="Remove screenshot N"`), and a meta row: the method label (`Automatic capture may not be exact.` /
 `Captured from your screen`), an `annotated` flag, and, for `render` shots only, a
 **Misaligned? Tell us** toggle button (`aria-pressed`; it reads "Misaligned · noted" when on) whose
 `title` explains the redraw and points to the exact buttons. The flagged screenshots' numbers go in
-`context.capture.misaligned`, and a line thanks the reporter and says Whole page gives exact pixels.
+`context.capture.misaligned`, and a line thanks the reporter and says Click the **Whole Page** or **Pick a Part** to take a screenshot in your browser.
 Beside the two buttons, a `(?)` (`role="note"`, focusable, `aria-label="About screenshots"`) carries
 what used to be a paragraph under them, as its `title`: "Optional — the report files without one."
 when empty, else "Adds another; it does not replace what is already here." plus "Both use your
@@ -238,10 +238,18 @@ closed ──open (button, Alt+F)──▶ loading-draft ──▶ editing
 editing ──Pick a part──▶ picking ──pick──▶ shooting ──▶ editing (+1 shot)   [cancel ▶ editing]
 editing ──Whole page──▶ shooting ──▶ editing (+1 shot | failed=true)
 editing ──Annotate──▶ annotating ──Done──▶ editing (shot replaced, annotated) [Cancel ▶ editing]
-editing ──File it / ⌘↵──▶ saving ──kept in outbox or on server──▶ saved ──▶ closed (draft discarded)
-                                 └─neither──▶ failed (panel stays, draft kept, reason shown)
+editing ──File it / ⌘↵──▶ filed screen at once (draft discarded once kept in the outbox or on the server)
+                         └─neither kept it──▶ failed (back to editing, draft kept, reason shown)
+filed ──Give more feedback / ⌘↵──▶ editing (empty, new automatic screenshot, same page)
+filed ──Esc / Close──▶ closed
 editing ──Esc / Cancel / scrim──▶ closed (draft kept)
 ```
+
+The filed screen reads where the report stands from the outbox by the client id the box chose for
+it (sending → on the server → filed as N, or kept in this browser / refused), and records each number
+in its own state, since the outbox shows a filed number only for a few seconds. From the second
+report on it lists every report filed while the box has been open. Nothing autosaves a draft while
+it shows.
 
 On open: `load(currentRoute)`. If a draft exists for the route, restore its words at once and, if it
 recorded pictures, clear `shots`, set `hydrating`, read the pictures from IndexedDB, then clear
@@ -777,7 +785,7 @@ lists what the kit automates today and what it cannot automate headless.
 
 **Capture**
 
-5. On open, one screenshot appears within 12 s, labelled "Drawn from the page", and the panel is not in
+5. On open, one screenshot appears within 12 s, labelled "Automatic capture may not be exact.", and the panel is not in
    it (sample a pixel where the panel was: it matches the page).
 6. Pixel test: on a fixture page with self-hosted fonts, a sticky header, a scrolled position (700 px)
    and a table taller than the viewport, the redraw differs from `page.screenshot()` on under 0.5% of

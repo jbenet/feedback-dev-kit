@@ -36,6 +36,9 @@ async function dropImage(page: Page, name: string) {
   await page.locator('.mdrichwrap').dispatchEvent('drop', { dataTransfer });
 }
 
+/** The filed screen's heading: where the report just filed stands. */
+const filedHeading = (page: Page) => page.getByRole('dialog', { name: 'Give feedback' }).locator('.fbfiledhead');
+
 /** The rail's status line. */
 const status = (page: Page) => page.locator('.obchip');
 
@@ -115,6 +118,9 @@ test('files a report end to end: shortcut, markdown, dropped file, region shot, 
   expect(request.imageOffset).toBe(2);
   expect(request.context.route).toBe('/reports');
   expect(request.context.filters).toEqual({ region: 'harbor' });
+  // The box stays open on the filed screen; Escape closes it.
+  await expect(filedHeading(page)).toBeVisible();
+  await page.keyboard.press('Escape');
   await expect(box).toBeHidden();
 
   // Journaled on the server at once, then filed; the rail says so.
@@ -186,6 +192,53 @@ test.describe('on a touch screen', () => {
   });
 });
 
+test('the filed screen: several reports in a row without reopening the box', async ({ page }) => {
+  await page.goto('/');
+  const box = await openWithShortcut(page);
+  // Hold the answer to "is it filed yet?" so the screen is seen before its number arrives.
+  const hold = (route: import('@playwright/test').Route) => route.fulfill({ json: { state: 'journaled' } });
+  await page.route('**/api/feedback?clientId=*', hold);
+  await page.keyboard.type('First of two invented reports: the late tile flickers');
+  await page.keyboard.press('ControlOrMeta+Enter');
+
+  await expect(filedHeading(page)).toHaveText('Saved on the server · being filed');
+  await expect(box.getByRole('link', { name: 'Open the issue' })).toHaveAttribute('aria-disabled', 'true');
+  await expect(box.getByRole('button', { name: 'Give more feedback' })).toBeFocused();
+  const layout = () => box.locator('.fbfiled .acts .btn, .fbfiledhead, .fbfiled > p').evaluateAll(
+    (els) => els.map((e) => { const r = e.getBoundingClientRect(); return [r.x, r.y, r.width, r.height].map(Math.round).join(','); }));
+  const before = await layout();
+
+  // The number arrives; nothing on the screen moves or changes size.
+  await page.unroute('**/api/feedback?clientId=*', hold);
+  await expect(filedHeading(page)).toHaveText(/^Filed as issue #\d+$/, { timeout: 20_000 });
+  expect(await layout()).toEqual(before);
+  const first = Number(/#(\d+)$/.exec(await filedHeading(page).innerText())![1]!);
+  const firstHref = (await box.getByRole('link', { name: 'Open the issue' }).getAttribute('href'))!;
+  expect(Number(/\/issues\/(\d+)$/.exec(firstHref)![1])).toBe(first);
+
+  // ⌘/Ctrl+Enter here means "another": an empty box with a new automatic screenshot.
+  await page.keyboard.press('ControlOrMeta+Enter');
+  await expect(editor(page)).toBeVisible();
+  await expect(editor(page)).toHaveText('');
+  await expect(box.locator('.shotthumb img')).toHaveCount(1);
+
+  await editor(page).focus();
+  await page.keyboard.type('Second of two invented reports: the reports tab is slow');
+  await page.keyboard.press('ControlOrMeta+Enter');
+  await expect(filedHeading(page)).toHaveText(/^Filed as issue #\d+$/, { timeout: 20_000 });
+  const list = box.locator('.fbfiledlist');
+  await expect(list.locator('.lbl')).toHaveText('Filed while this was open · 2');
+  await expect(list.getByRole('link')).toHaveCount(2);
+  await expect(list.getByRole('link').first()).toHaveAttribute('href', firstHref);
+  await expect(list.locator('.fbfiledno').first()).toHaveText(`#${first}`);
+  // One number column: every title starts at the same x.
+  const titles = await list.locator('.fbfiledtitle').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().left)));
+  expect(new Set(titles).size).toBe(1);
+
+  await page.keyboard.press('Escape');
+  await expect(box).toBeHidden();
+});
+
 test('a draft survives a reload', async ({ page }) => {
   await page.goto('/settings');
   await openWithShortcut(page);
@@ -221,6 +274,8 @@ test('the outbox keeps a report while the server is down and replays it when it 
   const box = await openWithShortcut(page);
   await page.keyboard.type(words);
   await page.keyboard.press('ControlOrMeta+Enter');
+  await expect(filedHeading(page)).toContainText(/Kept in this browser .* sent again when the server answers/);
+  await page.keyboard.press('Escape');
   await expect(box).toBeHidden();
   await expect(status(page)).toContainText('1 report only on this device');
 
@@ -304,6 +359,47 @@ test.describe('annotating on a phone', () => {
   });
 });
 
+test('the annotator: select a mark to move or delete it; stroke widths sit with the colors', async ({ page }) => {
+  await page.goto('/');
+  const box = await openWithShortcut(page);
+  await box.getByRole('button', { name: 'Annotate screenshot 1' }).click();
+  const bar = page.getByRole('toolbar', { name: 'Annotation tools' });
+  const canvas = page.locator('.setcanvas');
+  const c = (await canvas.boundingBox())!;
+  const note = page.locator('.setnote');
+
+  // A thick line.
+  await bar.getByRole('button', { name: /^Color and stroke width/ }).click();
+  await page.getByRole('button', { name: 'Thick stroke' }).click();
+  await expect(bar.getByRole('button', { name: /^Color and stroke width: .*, Thick$/ })).toBeVisible();
+  await page.keyboard.press('Escape'); // closes the popover, not the editor
+  await expect(bar).toBeVisible();
+  await bar.getByRole('button', { name: 'Draw a line' }).click();
+  await page.mouse.move(c.x + 60, c.y + 60);
+  await page.mouse.down();
+  await page.mouse.move(c.x + 200, c.y + 140, { steps: 5 });
+  await page.mouse.up();
+  await expect(note).toContainText('1 mark ');
+
+  // Select it by clicking on it, drag it, delete it.
+  await bar.getByRole('button', { name: /^Select/ }).click();
+  await page.mouse.click(c.x + 130, c.y + 100);
+  await page.mouse.move(c.x + 130, c.y + 100);
+  await page.mouse.down();
+  await page.mouse.move(c.x + 130, c.y + 180, { steps: 4 });
+  await page.mouse.up();
+  await expect(note).toContainText('1 mark ');
+  await page.keyboard.press('Delete');
+  await expect(note).toContainText('0 marks');
+
+  // Tooltips in the editor are dark, like its bars.
+  await bar.getByRole('button', { name: 'Draw a line' }).hover();
+  const bg = await bar.getByRole('button', { name: 'Draw a line' }).evaluate((el) => getComputedStyle(el, '::after').backgroundColor);
+  expect(bg).toBe('rgb(26, 25, 23)');
+  await page.keyboard.press('Escape');
+  await expect(bar).toBeHidden();
+});
+
 test('signed out, the issues and their pictures are closed; a report still files', async ({ page, context, baseURL }) => {
   await context.clearCookies();
   const origin = new URL(baseURL!).origin;
@@ -326,6 +422,8 @@ test('signed out, the issues and their pictures are closed; a report still files
   const posted = page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/feedback');
   await page.keyboard.press('ControlOrMeta+Enter');
   expect((await posted).status()).toBe(202);
+  await expect(filedHeading(page)).toBeVisible();
+  await page.getByRole('button', { name: 'Close' }).click();
   await expect(box).toBeHidden();
 
   // Sign in as someone from the rail, and the list is there.

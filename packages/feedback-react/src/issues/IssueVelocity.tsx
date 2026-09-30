@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import type { Issue } from './types';
 import { issueVelocity } from './velocity';
 
@@ -8,7 +9,23 @@ export function IssueVelocity({ issues, now }: { issues: Issue[]; now?: Date }) 
   const { days } = velocity;
   const maxActivity = Math.max(1, ...days.flatMap((d) => [d.filed, d.closed]));
   const maxOpen = Math.max(1, ...days.map((d) => d.openMax));
-  const x = (index: number) => 38 + index * 19;
+  // The chart is drawn at the card's own width, so it fills the card at any size with text at its
+  // real size (a fixed viewBox scaled up would enlarge the labels, or leave the card half empty).
+  const wrap = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(620);
+  useEffect(() => {
+    const el = wrap.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const measure = () => setWidth(Math.max(320, Math.round(el.clientWidth)));
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const right = width - 17;
+  const step = (right - 14 - 38) / Math.max(1, days.length - 1);
+  const bar = Math.min(14, Math.max(6, Math.floor(step * 0.32)));
+  const x = (index: number) => 38 + index * step;
   const y = (value: number) => 192 - value / maxOpen * 48;
   const line = (key: 'openMin' | 'openMax') => days.map((d, i) => `${x(i)},${y(d[key])}`).join(' ');
   const first = days[0]!;
@@ -31,23 +48,25 @@ export function IssueVelocity({ issues, now }: { issues: Issue[]; now?: Date }) 
           <span>▮ Filed</span><span className="velocity-closed">▯ Closed</span>
           <span>— Open count · dashed line: upper bound where dates are missing</span>
         </div>
-        <svg viewBox="0 0 620 222" role="img" aria-labelledby="velocity-chart-title" className="velocity-chart">
+        <div ref={wrap}>
+        <svg viewBox={`0 0 ${width} 222`} width={width} height={222} role="img" aria-labelledby="velocity-chart-title" className="velocity-chart">
           <title id="velocity-chart-title">Daily issues filed and closed, and reconstructed open count. Exact values in the daily list below.</title>
           <text x="0" y="12">{maxActivity}</text><text x="0" y="99">0</text>
-          <line x1="28" y1="96" x2="603" y2="96" className="velocity-axis" />
+          <line x1="28" y1="96" x2={right} y2="96" className="velocity-axis" />
           {days.map((d, i) => (
             <g key={d.date}>
-              <rect x={x(i) - 7} y={96 - d.filed / maxActivity * 80} width="6" height={d.filed / maxActivity * 80} className="velocity-filed-bar" />
-              <rect x={x(i) + 1} y={96 - d.closed / maxActivity * 80} width="6" height={d.closed / maxActivity * 80} className="velocity-closed-bar" />
+              <rect x={x(i) - bar - 1} y={96 - d.filed / maxActivity * 80} width={bar} height={d.filed / maxActivity * 80} className="velocity-filed-bar" />
+              <rect x={x(i) + 1} y={96 - d.closed / maxActivity * 80} width={bar} height={d.closed / maxActivity * 80} className="velocity-closed-bar" />
             </g>
           ))}
           <text x="28" y="125">Open count</text>
           <text x="0" y="148">{maxOpen}</text><text x="0" y="195">0</text>
-          <line x1="28" y1="192" x2="603" y2="192" className="velocity-axis" />
+          <line x1="28" y1="192" x2={right} y2="192" className="velocity-axis" />
           <polyline points={line('openMax')} className="velocity-open upper" />
           <polyline points={line('openMin')} className="velocity-open" />
-          <text x="28" y="216">{first.date}</text><text x="603" y="216" textAnchor="end">{last.date}</text>
+          <text x="28" y="216">{first.date}</text><text x={right} y="216" textAnchor="end">{last.date}</text>
         </svg>
+        </div>
         <p className="muted velocity-note">
           Based on current issue files and their latest recorded closure; earlier close/reopen cycles are not recorded.
           {' '}{velocity.undatedClosures} done {velocity.undatedClosures === 1 ? 'issue has' : 'issues have'} no valid closure date and cannot be assigned to a day.

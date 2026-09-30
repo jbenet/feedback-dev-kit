@@ -2,6 +2,52 @@
 
 Both packages share one version.
 
+## Unreleased
+
+- **Annotator** (issue #10): a **Select** tool (move or delete a mark, or just leave another tool),
+  **stroke widths** beside the colors, dark tooltips that are never hidden under the picture, and
+  "Color" in US spelling.
+- **Filed screen** (issues #14, #15): numbers read `#12` in one right-aligned column, so titles line up
+  whether numbered or not; nothing on the screen moves or resizes when the number arrives.
+- **The filed screen** (issue #7). File no longer closes the box: it stays open on where the report
+  stands ("Sending…", "Saved on the server · being filed", "Kept in this browser…", "Refused…",
+  "Filed as issue N"), with **Give more feedback** (⌘/Ctrl+Enter) for another report from the same
+  page, **Open the issue**, and **Close**. From the second report, a list of everything filed while
+  the box was open. File still returns at once; `enqueue()` takes an optional `clientId`.
+- **Card alignment** (issue #8): card bodies on the issues pages had no padding, so their content sat
+  against the card's left edge instead of under its heading; they now line up. The issue velocity
+  chart is also drawn at its card's width, so it fills the card on a wide screen.
+- **Prompt injection** (issue #6). The ingester neutralizes every report (invisible characters removed,
+  HTML comments shown as text) and screens it by patterns; a hit is filed with the `suspicious` label and
+  a warning on top, or refused with `onSuspicious: 'refuse'` (the handler then answers 422 with the reason,
+  which the reporter sees). `screen: anthropicScreen()` adds a model that also reads the screenshots.
+  docs/TRIAGE.md §10 says how agents read the queue: as untrusted data, skipping `suspicious` issues.
+- **GitHub issue filing in the example.** Set `FEEDBACK_GITHUB_REPO=owner/name` and the example files
+  reports as GitHub issues (`githubStore`) instead of markdown files, mirrored in `.data/github`, with
+  pictures linked from this server (`FEEDBACK_GITHUB_PICTURES=link`, the default), uploaded to a
+  GitHub branch and shown in the issue (`upload`), or only counted (`none`). The token is `FEEDBACK_GITHUB_TOKEN` (a
+  fine-grained token for that one repository, Issues read/write). `FEEDBACK_GITHUB_LABEL` changes the
+  base label (default `feedback`); `FEEDBACK_APP_URL` the address the picture links use.
+- `githubStore`: `token` may be a function, asked before each request; `destination` sets the sentence
+  the issues pages show.
+- `githubStore` `custom` pictures: `upload(picture)` sends each picture wherever you choose and returns
+  the URL the issue embeds. The README says why GitHub's own drag-and-drop upload cannot be used
+  from a server (no API; it needs a browser session).
+- `githubStore` `repo` pictures: a `branch` that does not exist is created on first use, with no parent
+  (one README commit), so pictures never share history with the code. The private-repository check
+  (`allowPublic`) is gone: the repository you name is the one used.
+- `githubStore` sync: an issue reopened on GitHub comes back as open. GitHub keeps the `status:done`
+  label on reopen, and sync used to read it and leave the mirror at done.
+
+## 0.1.2 — 29 Sep 2026
+
+- Line breaks (Shift+Enter) are stored as plain newlines, not tiptap-markdown's `\` + newline, so the
+  Markdown tab and reopened drafts no longer show a backslash at each break.
+- Tooltips in the sheet show at once on hover and keyboard focus (CSS `data-tip`), instead of the
+  browser's delayed `title` tooltip.
+- Wording: the automatic capture is labelled "Automatic capture may not be exact."; after "Misaligned?"
+  the hint says "Click the **Whole Page** or **Pick a Part** to take a screenshot in your browser."
+
 ## 0.1.1 (29 Sep 2026, unreleased)
 
 The feedback sheet, per Juan's review of 0.1.0.

@@ -6,6 +6,7 @@ import {
   type Editor, type ReactNodeViewProps,
 } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import HardBreak from '@tiptap/extension-hard-break';
 import { NodeSelection } from '@tiptap/pm/state';
 import Image from '@tiptap/extension-image';
 import { Markdown } from 'tiptap-markdown';
@@ -236,7 +237,15 @@ export function MarkdownField({
     autofocus: autoFocus ? 'end' : false,
     extensions: [
       // StarterKit carries Link in v3; adding it again registered two and warned about it.
-      StarterKit.configure({ heading: { levels: [3, 4] }, link: { openOnClick: false } }),
+      StarterKit.configure({ heading: { levels: [3, 4] }, link: { openOnClick: false }, hardBreak: false }),
+      /* A line break (Shift+Enter) is written as a plain newline: with `breaks: true` a single newline
+         reads back as a line break, so the stored text round-trips without tiptap-markdown's default
+         backslash ("line one\\"), which showed up in the Markdown tab and in drafts (Juan, 29 Sep). */
+      HardBreak.extend({
+        addStorage() {
+          return { markdown: { serialize(state: { write: (s: string) => void }) { state.write('\n'); }, parse: {} } };
+        },
+      }),
       /* allowBase64: the pictures in the rich view are data URLs swapped in for the stored
          `attachment:N` tokens. With the default (false) TipTap refuses to parse them, so any
          rebuild from markdown — the Markdown→Rich toggle, or redrawing after an annotation —

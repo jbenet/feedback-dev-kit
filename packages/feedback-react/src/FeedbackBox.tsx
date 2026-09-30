@@ -11,7 +11,10 @@ import { MarkdownField, packAttachments, type DroppedImage } from './MarkdownFie
 import {
   configureDrafts, discardDraft, listDrafts, readDraft, readPictures, writeDraft, writePictures, type DraftSummary,
 } from './drafts';
-import { configureOutbox, enqueue, startOutbox } from './outbox';
+import { configureOutbox, enqueue, startOutbox, type OutboxState } from './outbox';
+import { useOutbox } from './FeedbackOutbox';
+import { firstLine } from './journal';
+import { newRequestKey } from './request-key';
 import { currentLocation, themeStyle, useFeedbackConfig, type ResolvedFeedbackConfig } from './config';
 import { savedAt } from './time';
 import { useFocusTrap } from './useSheet';
@@ -84,7 +87,7 @@ export function FeedbackButton({
         className={`${cls}${className ? ` ${className}` : ''}`}
         onClick={() => setOpen(true)}
         aria-keyshortcuts={ariaShortcut(config.shortcut, apple)}
-        title={`Give feedback (${label})`}
+        data-tip={`Give feedback (${label})`}
       >
         {children ?? (variant === 'rail' ? <><span aria-hidden>✎</span> Feedback</> : 'Give feedback')}
         <span className="feedbackkey">{label}</span>
@@ -210,7 +213,9 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
       }
       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        void submitRef.current?.();
+        // On the filed screen it means another report, never filing the one just sent again.
+        if (stateRef.current === 'saved') againRef.current?.();
+        else void submitRef.current?.();
       }
       if (isShortcutsKey(e)) {
         e.preventDefault();
@@ -326,6 +331,29 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
   );
 
   const submitRef = useRef<(() => Promise<void>) | null>(null);
+  const againRef = useRef<(() => void) | null>(null);
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  /**
+   * Reports filed while the box has been open, newest last, with the number each got. The outbox
+   * shows a filed number only for a few seconds, so each one is recorded here as it is reported.
+   */
+  const [filedHere, setFiledHere] = useState<FiledHere[]>([]);
+  const outbox = useOutbox();
+  useEffect(() => {
+    setFiledHere((prev) => {
+      let changed = false;
+      const next = prev.map((f) => {
+        const seen = standing(outbox, f);
+        if (seen.id === f.id && seen.where === f.where) return f;
+        changed = true;
+        return { ...f, ...seen };
+      });
+      return changed ? next : prev;
+    });
+  }, [outbox]);
+  const current = filedHere.at(-1);
 
   /**
    * File it. The report is kept in this browser first (outbox.ts), then posted with a 3 s timeout;
@@ -338,10 +366,14 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
     if (!body.trim()) return;
     if (state !== 'idle' && state !== 'failed') return;
     if (imagesPending || hydrating.current) return;
-    setState('saving');
     setError(null);
     // A picture deleted from the text is not sent — it may be the wrong one.
     const packed = packAttachments(body, images);
+    // The filed screen shows at once: nothing waits on the server. Where the report stands is read
+    // from the outbox by this key as it moves (sending, on the server, filed).
+    const clientId = newRequestKey();
+    setFiledHere((prev) => [...prev, { clientId, title: firstLine(packed.body) || 'Report', id: null, where: 'Sending…', refused: false }]);
+    setState('saved');
     try {
       await enqueue({
         body: packed.body, kind, priority, page: path, context,
@@ -350,18 +382,33 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
         // The server numbers attachments with the screenshots first, so a body written against
         // `attachment:1` needs an offset for the screenshots still attached.
         imageOffset: shots.length,
-      });
+      }, { clientId });
     } catch (err) {
+      // Neither this browser nor the server kept it: back to the words, with the reason.
+      setFiledHere((prev) => prev.filter((f) => f.clientId !== clientId));
       setError(err instanceof Error ? err.message : String(err));
       setState('failed');
       return;
     }
-    // Kept in the outbox now: the draft goes, and nothing autosaves it back on the way out.
-    setState('saved');
+    // Kept in the outbox now: the draft goes, and nothing autosaves it back while the filed screen shows.
     void discardDraft(draftPage);
-    onClose();
   };
   submitRef.current = submit;
+
+  /** Another report from the same page: a fresh box, a new automatic screenshot. */
+  const again = () => {
+    setBody('');
+    setImages([]);
+    setShots([]);
+    setFailed(false);
+    setRestored(null);
+    setError(null);
+    setDraftPage(path);
+    setGeneration((g) => g + 1);
+    setState('idle');
+    seedShot();
+  };
+  againRef.current = again;
 
   const ui = (
     <div className="fbk nocapture" style={themeStyle(config.theme)}>
@@ -409,7 +456,7 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
               className="drawerwide"
               onClick={() => setShowDrafts((v) => !v)}
               aria-expanded={showDrafts}
-              title="Unsent reports kept in this browser, started on other pages"
+              data-tip="Unsent reports kept in this browser, started on other pages"
             >
               Drafts · {others.length}
             </button>
@@ -419,11 +466,21 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
             className="drawerwide"
             onClick={toggleWide}
             aria-pressed={wide}
-            title={wide ? 'Back to the narrow panel' : 'Use more of the page for a long report'}
+            data-tip={wide ? 'Back to the narrow panel' : 'Use more of the page for a long report'}
           >
             {wide ? '⇥ Narrower' : '⇤ Wider'}
           </button>
         </div>
+        {state === 'saved' && current ? (
+          <FiledScreen
+            current={current}
+            all={filedHere}
+            href={config.issueHref}
+            modifier={modifier}
+            onAgain={again}
+            onClose={onClose}
+          />
+        ) : (<>
         {showDrafts && others.length > 0 && state !== 'saved' && (
           <div className="draftlist">
             <div className="lbl">Unsent, kept in this browser · {others.length}</div>
@@ -458,8 +515,8 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
                     <img src={x.dataUrl} alt={`Screenshot ${i + 1}`} />
                   </button>
                   <div className="mdembedbar">
-                    <button type="button" onClick={() => setEditingId(x.id)} title="Draw on this picture">✎ Annotate</button>
-                    <button type="button" className="x" onClick={() => drop(x.id)} aria-label={`Remove screenshot ${i + 1}`} title={`Delete screenshot ${i + 1}`}>×</button>
+                    <button type="button" onClick={() => setEditingId(x.id)} data-tip="Draw on this picture">✎ Annotate</button>
+                    <button type="button" className="x" onClick={() => drop(x.id)} aria-label={`Remove screenshot ${i + 1}`} data-tip={`Delete screenshot ${i + 1}`}>×</button>
                   </div>
                   <div className="shotmeta">
                     <span className={`flag ${x.method === 'screen' ? 'f-ok' : 'f-mute'}`}>{METHOD_LABEL[x.method]}</span>
@@ -470,13 +527,13 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
                         className={`misaligned${x.misaligned ? ' on' : ''}`}
                         aria-pressed={Boolean(x.misaligned)}
                         onClick={() => flagMisaligned(x.id)}
-                        title={
+                        data-tip={
                           'The automatic capture is your browser redrawing the page from its own '
                           + 'markup. It needs no permission and it leaves this panel out — but it '
                           + 'can get spacing, wrapping or a form control subtly wrong.\n\n'
                           + 'Press to tell us it does not match your screen: the report says so, '
                           + 'which helps fix the capture. For exact pixels, press Whole page or '
-                          + "Pick a part below; they use your browser's own screen capture."
+                          + "Pick a part below; they take a screenshot in your browser."
                         }
                       >
                         {x.misaligned ? 'Misaligned · noted' : 'Misaligned? Tell us'}
@@ -497,11 +554,11 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
                 Pick a part
               </button>
               <span
-                className="fbhelp"
+                className="fbhelp" data-tip-end=""
                 tabIndex={0}
                 role="note"
                 aria-label="About screenshots"
-                title={
+                data-tip={
                   (shots.length === 0
                     ? 'Optional — the report files without one.'
                     : 'Adds another; it does not replace what is already here.')
@@ -520,7 +577,7 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
               </p>
             )}
             {shots.some((x) => x.misaligned) && (
-              <p className="mdhint">Thanks — the report says the automatic capture was off. Whole page gives exact pixels.</p>
+              <p className="mdhint">Thanks — the report says the automatic capture was off. Click the <b>Whole Page</b> or <b>Pick a Part</b> to take a screenshot in your browser.</p>
             )}
           </div>
 
@@ -605,9 +662,100 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
           <summary>Captured with it: the page, its filters and the device</summary>
           <div className="ctx">{JSON.stringify(context, null, 2)}</div>
         </details>
+        </>)}
       </div>
     </div>
   );
 
   return mounted ? createPortal(ui, document.body) : null;
+}
+
+/** `#12` for a numeric id (the files store pads it, `0012`), else the id as it is. */
+const issueLabel = (id: string) => (/^\d+$/.test(id) ? `#${Number(id)}` : id);
+
+/** A report filed while the box was open, and where it stands. */
+interface FiledHere { clientId: string; title: string; id: string | null; where: string; refused: boolean }
+
+/**
+ * Where one report stands, from the outbox: filed (with its number), refused, still in this browser,
+ * being sent, or on the server waiting to be filed. What the outbox no longer mentions keeps what was
+ * last seen, since a filed number is only on show for a few seconds.
+ */
+function standing(out: OutboxState, f: FiledHere): Pick<FiledHere, 'id' | 'where' | 'refused'> {
+  const filed = out.filed.find((n) => n.clientId === f.clientId);
+  if (filed?.error) return { id: null, where: `Refused by the server: ${filed.error}`, refused: true };
+  if (filed?.id) return { id: filed.id, where: `Filed as issue ${filed.id}`, refused: false };
+  if (filed) return { id: f.id, where: 'Saved on the server', refused: false };
+  const entry = out.entries.find((e) => e.clientId === f.clientId);
+  if (entry?.refused) return { id: null, where: `Refused by the server: ${entry.lastError ?? 'no reason given'}`, refused: true };
+  if (out.sending.includes(f.clientId)) return { id: f.id, where: 'Sending…', refused: false };
+  if (entry) {
+    return { id: null, where: `Kept in this browser${entry.lastError ? ` (${entry.lastError})` : ''} · sent again when the server answers`, refused: false };
+  }
+  if (out.onServer.some((n) => n.clientId === f.clientId)) return { id: f.id, where: 'Saved on the server · being filed', refused: false };
+  return { id: f.id, where: f.where, refused: f.refused };
+}
+
+/**
+ * After File: the drawer stays open on where the report stands, so several can be filed in a row.
+ * "Give more feedback" (and ⌘/Ctrl+Enter) gives a fresh box on the same page.
+ */
+function FiledScreen({ current, all, href, modifier, onAgain, onClose }: {
+  current: FiledHere; all: FiledHere[]; href: (id: string) => string; modifier: string; onAgain: () => void; onClose: () => void;
+}) {
+  const heading = current.id ? `Filed as issue ${issueLabel(current.id)}` : current.where;
+  // Nothing on this screen changes size when the number arrives: the heading is one line, the
+  // thanks line is always there, the note under it keeps its line, and Open the issue is the same
+  // element before and after (a link, disabled until there is somewhere to go).
+  const note = current.refused ? '' : current.id
+    ? 'You can close the box, or file another.'
+    : 'Its number shows here when the server gives it one; you can close the box before then.';
+  return (
+    <div className="fbfiled" role="status" aria-live="polite">
+      <h3 className={`fbfiledhead${current.refused ? ' refused' : ''}`} title={heading}>{heading}</h3>
+      <p className="muted">Thanks — it is in the queue with this page, your filters and any screenshots attached.</p>
+      <p className="muted fbfilednote">{note}</p>
+      <div className="acts">
+        {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
+        <button type="button" className="btn p" onClick={onAgain} autoFocus>Give more feedback</button>
+        <a
+          className="btn"
+          href={current.id ? href(current.id) : undefined}
+          aria-disabled={current.id ? undefined : true}
+          role="link"
+        >
+          Open the issue
+        </a>
+        <button type="button" className="btn" onClick={onClose}>Close</button>
+      </div>
+      <div className="keyhint">
+        <span><kbd>{modifier}</kbd><kbd>↵</kbd> another</span>
+        <span><kbd>esc</kbd> close</span>
+      </div>
+      {all.length > 1 && (
+        <div className="fbfiledlist">
+          <div className="lbl">Filed while this was open · {all.length}</div>
+          {/* One grid for all rows, so the number column is as wide as its widest entry and every
+              title starts at the same place, numbered or not. */}
+          <ul>
+            {all.map((f) => (
+              <li key={f.clientId}>
+                {f.id ? (
+                  <a href={href(f.id)}>
+                    <span className="fbfiledno">{issueLabel(f.id)}</span>
+                    <span className="fbfiledtitle">{f.title}</span>
+                  </a>
+                ) : (
+                  <span className="fbfiledpending" data-tip={f.where} title={f.where}>
+                    <span className="fbfiledno" aria-label="No number yet">…</span>
+                    <span className="fbfiledtitle">{f.title}</span>
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
 }

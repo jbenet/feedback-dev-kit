@@ -119,6 +119,7 @@ The server also accepts `client_id`, an optional `title` (from agents filing thr
 | `accept` | `true` | `false` (or a function) answers 403 with `refusalMessage`. Use this on every server that must not file: only one server may hand out numbers. |
 | `exportToken` | `$FEEDBACK_EXPORT_TOKEN` | |
 | `authorize(req, action)` | allow all | `action` is `'read'`, `'update'` or `'attachment'`. Return true, false (403) or your own Response (a 401, say). Issues can hold anything a reporter saw: **supply this**, as you supply `resolveReporter`, or every issue and picture is readable by anyone who can reach the server. The example's is a demo "sign in as" cookie, which is not authentication. |
+| `onSuspicious` | `'flag'` | `'refuse'` answers 422 when the report matches the prompt-injection patterns ([Prompt injection](#prompt-injection)); the browser keeps it and shows the reason. `'flag'` leaves it to the ingester. |
 | `onJournaled(clientId)` | kick the ingester | |
 
 ### `startIngester(options)` / `createIngester(options)`
@@ -136,6 +137,10 @@ The server also accepts `client_id`, an optional `title` (from agents filing thr
 | `everyMs` | 10 s | Passes also run at start-up and after each journal write. |
 | `backoff(attempts)` | 2 s, 10 s, 30 s, 2 min, then every 5 min | Per entry. A store's `RetryLaterError` waits at least as long as it asks and pauses the pass. |
 | `syncEveryMs` | 60 s | For stores with `sync()` (GitHub). |
+| `screen` | none | An extra prompt-injection screen, `(input, signal) => Promise<{ action, reasons }>`; `anthropicScreen()` reads the pictures too. The patterns always run. |
+| `onSuspicious` | `'flag'` | `'refuse'` sets a suspicious report aside in `refused/` instead of filing it flagged. |
+| `suspiciousLabel` | `suspicious` | |
+| `screenTimeoutMs` | 20 s | A screen that fails or times out flags the report. |
 | `onFiled(issue, entry)` | none | Use it to notify a channel or start an agent. |
 
 ### Titles
@@ -155,6 +160,31 @@ startIngester({ journal, store, generateTitle: anthropicTitle({ model: 'claude-h
   characters at most.
 - A title the sender typed is kept as given, and no model is called.
 - It runs in the ingester, never on the request.
+
+### Prompt injection
+
+A report is written by whoever can reach the box and read by people and agents. Every report is
+**neutralized** before filing (invisible characters removed; HTML comments, which GitHub hides, shown as
+text) and **screened** by patterns for the usual shapes of an injection: asks to ignore instructions,
+role changes, chat markup, commands to run, requests to send secrets, text addressed to an AI.
+
+```ts
+import { anthropicScreen } from '@jbenet/feedback-server';
+startIngester({ journal, store, screen: anthropicScreen() });   // also reads text in screenshots
+```
+
+- **Flagged** (default): the issue gets the `suspicious` label, a warning at the top of its body, the
+  reasons in `context.screening`, and a first-sentence title (no model reads it for a title).
+- **Refused** (`onSuspicious: 'refuse'` on the ingester, or a screen that says so): set aside in
+  `refused/` with the reasons. On the handler, `onSuspicious: 'refuse'` answers 422 at once instead.
+- The patterns are heuristics. They also flag some honest reports that talk about prompts, which is
+  why the default flags and a person decides.
+- `anthropicScreen()` sends the text and up to four pictures to Anthropic's API (`FEEDBACK_SCREEN_API_KEY`,
+  then `ANTHROPIC_API_KEY`; `FEEDBACK_SCREEN_MODEL`, default `claude-haiku-4-5`). Without a key it says
+  nothing and the patterns decide.
+- `neutralize()`, `screenText()` and `patternScreen()` are exported for readers: an agent reading the
+  queue checks again, since an issue can be edited after filing. How agents treat issues is in
+  [docs/TRIAGE.md §10](../../docs/TRIAGE.md#10-untrusted-input-prompt-injection).
 
 ## Stores
 
@@ -212,10 +242,13 @@ const store = githubStore({
 });
 ```
 
-- **Token.** Read from `FEEDBACK_GITHUB_TOKEN`, then `GITHUB_TOKEN`. Use a fine-grained token or a
-  GitHub App token for this one repository, with Issues read/write and Metadata read. Add Contents
-  read/write only for `repo` pictures, and only on the assets repository. With no token, reports wait
-  in the journal.
+- **Token.** Set `FEEDBACK_GITHUB_TOKEN` in the server's environment (`GITHUB_TOKEN` is read too).
+  Least privilege: create a [fine-grained personal access token](https://github.com/settings/personal-access-tokens/new)
+  (or a GitHub App installation token) for this one repository with **Issues: read and write**;
+  Metadata: read comes with it. Add Contents: read and write only for `repo` pictures, and only on
+  the assets repository. Avoid classic tokens: `repo` scope reaches every repository you can. The
+  `token` option overrides the environment, as a string or a function asked before each request (for
+  a GitHub App's rotating token). With no token, reports wait in the journal.
 - **Issues.** Each report becomes an issue with the labels `feedback`, `kind:*`, `priority:*` and
   `status:*`, created on first use. The reporter, page and captured context go in the body, with a
   hidden `<!-- feedback-kit client_id: … -->` marker. A body over 65,536 characters is cut with a note;
@@ -242,11 +275,46 @@ history after the issue is closed or deleted. Choose the mode deliberately:
 | `attachments.mode` | Pictures | Readable by |
 |---|---|---|
 | `local` (default) | Stay on your server. With `baseUrl`, the issue links to your `/api/issues/attachments/…` route, which requires your app's own auth. | People who can sign in to your app |
-| `repo` | Uploaded to `path/<clientId>/` in `repo`. That repository must be private: the store checks, and if it is public the pictures stay local unless you set `allowPublic`. Only pictures the body still shows are uploaded; images removed from the text stay local. | Collaborators on that repository, and its history forever |
+| `repo` | Uploaded to `path/<clientId>/` in `repo`, on `branch` (made on first use with no shared history, when it does not exist) or the default branch. Uses the REST contents API with the token (Contents: read and write), no git checkout. Only pictures the body still shows are uploaded; images removed from the text stay local. | Whoever can read that repository, and its history forever |
 | `none` | Stay on your server. The issue says only how many there are. | Nobody on GitHub |
+| `custom` | Handed to your `upload(picture)`, which stores it anywhere and returns the URL the issue embeds (or null to keep that one local). Only pictures the body still shows are handed over. | Whoever can open the URL you return |
 
 The report text always goes to GitHub. Do not use this store for apps whose screens or reports carry
 confidential data.
+
+**Getting pictures to GitHub another way.** The kit uses `repo` because it works with the issue token
+alone. GitHub's web interface puts dragged-in pictures on `github.com/user-attachments/…`, but that
+upload has no public API and only accepts a signed-in browser session, not a token, so a server
+cannot use it. To send pictures somewhere else — your own bucket or CDN, a GitHub release asset
+(`POST https://uploads.github.com/repos/{owner}/{repo}/releases/{id}/assets`, also Contents: write), an
+image host — pass `custom` and do the upload yourself:
+
+```ts
+import { githubStore, type PictureUpload } from '@jbenet/feedback-server/github';
+import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+
+const s3 = new S3Client({});
+const store = githubStore({
+  repo: 'acme/app',
+  dir: 'data/issues',
+  attachments: {
+    mode: 'custom',
+    // Called once per picture the report shows. Return the URL the issue embeds, or null to keep
+    // the picture on your server. Throwing retries the whole report later, so a report is never
+    // filed with pictures half sent.
+    upload: async (p: PictureUpload) => {
+      const key = `feedback/${p.clientId}/${p.name}`;
+      await s3.send(new PutObjectCommand({ Bucket: 'acme-feedback', Key: key, Body: p.bytes, ContentType: p.contentType }));
+      return `https://feedback-cdn.acme.example/${key}`;
+    },
+  },
+});
+```
+
+`p` carries `clientId`, `name` (as in the local mirror, `report-screenshot.png`), `kind`
+(`screenshot` or `image`), `contentType` and `bytes`. Keep uploads idempotent by that key: a report
+that fails later is sent again with the same client id and names. The example app picks the mode
+from `FEEDBACK_GITHUB_PICTURES` in `examples/next-app/lib/feedback.ts`; add a branch there for yours.
 
 ## The journal
 
@@ -283,6 +351,7 @@ confidential data.
 | `FEEDBACK_TITLE_API_KEY`, then `ANTHROPIC_API_KEY` | `anthropicTitle`, the default `generateTitle` | Titles by Claude. Unset: no model is called. |
 | `FEEDBACK_TITLE_MODEL` | `anthropicTitle` | Default `claude-haiku-4-5`. |
 | `FEEDBACK_TITLE_SCREENSHOT` | `anthropicTitle` | `0` keeps the screenshot out of the title request. |
+| `FEEDBACK_SCREEN_API_KEY`, then `ANTHROPIC_API_KEY`; `FEEDBACK_SCREEN_MODEL` | `anthropicScreen` | The model screen, when you pass it as `screen`. |
 | `FEEDBACK_GITHUB_TOKEN`, then `GITHUB_TOKEN` | `githubStore` | The token for the issues repository. |
 
 (`FEEDBACK_DATA` belongs to the example app, not the package: the folder it journals and files into.)
@@ -307,6 +376,7 @@ The tests cover:
 - idempotency before and after filing;
 - ingest retries, backoff, rate-limit pauses, refusals and identify failures;
 - titles;
+- prompt injection: the patterns against attacks and honest reports, neutralizing, flag and refuse, the model screen;
 - every store on better-sqlite3, `node:sqlite`, PGlite and optionally real Postgres;
 - the GitHub store against a mocked fetch;
 - size and origin refusals;

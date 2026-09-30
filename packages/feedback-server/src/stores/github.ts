@@ -13,8 +13,8 @@
  * An issue body is readable by everyone who can read the repository — the whole internet, for a
  * public one — and a picture uploaded to GitHub stays in its git history after the issue is closed
  * or deleted. So the default keeps pictures on your server ('local') and links to them there.
- * 'repo' uploads them to a repository you name, which must be private (checked; a public one is
- * refused and the pictures stay local). 'none' keeps them local and only counts them in the issue.
+ * 'repo' uploads them to a repository you name, readable by whoever can read it. 'none' keeps them
+ * local and only counts them in the issue.
  */
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
@@ -28,21 +28,46 @@ import { attachmentNames, fileStore, isoNow, padId, readAttachmentFrom, rewriteT
 export type GitHubAttachments =
   /** Pictures stay on this server. With `baseUrl`, the issue links to them (behind your app's own auth). */
   | { mode: 'local'; baseUrl?: string }
-  /** Uploaded to a private repository's contents under `path/<clientId>/`. */
-  | { mode: 'repo'; repo: string; branch?: string; path?: string; allowPublic?: boolean }
+  /**
+   * Uploaded to a repository's contents under `path/<clientId>/`, through the REST API with the token. A `branch` that does not
+   * exist yet is created with no history of its own (just a README), so the pictures stay off your
+   * code's branches.
+   */
+  | { mode: 'repo'; repo: string; branch?: string; path?: string }
   /** Pictures stay on this server and the issue only says how many there are. */
-  | { mode: 'none' };
+  | { mode: 'none' }
+  /**
+   * Your own transport (S3 or another bucket, a CDN, a GitHub release asset, an image host): called
+   * once per picture the report shows, returning the URL the issue embeds, or null to keep that one
+   * local. Throw to retry the whole report later.
+   */
+  | { mode: 'custom'; upload: (picture: PictureUpload) => Promise<string | null> };
+
+/** One picture on its way out, for a custom transport. */
+export interface PictureUpload {
+  clientId: string;
+  /** Its name in the local mirror, e.g. `report-screenshot.png`, `report-image-1.png`. */
+  name: string;
+  kind: 'screenshot' | 'image';
+  contentType: string;
+  bytes: Uint8Array;
+}
 
 export interface GitHubStoreOptions {
   /** `owner/name` of the repository that gets the issues. */
   repo: string;
-  /** Default: FEEDBACK_GITHUB_TOKEN, then GITHUB_TOKEN. Needs issues: write (and contents: write for 'repo' pictures). */
-  token?: string;
+  /**
+   * Default: FEEDBACK_GITHUB_TOKEN, then GITHUB_TOKEN. Needs issues: write (and contents: write for 'repo' pictures).
+   * A function is called before each request, for tokens that rotate (a GitHub App's) or arrive later.
+   */
+  token?: string | (() => string | undefined);
   /** Local mirror folder (absolute, or relative to process.cwd()). */
   dir: string;
   attachments?: GitHubAttachments;
   /** Every issue gets this label, plus kind:*, priority:*, status:*. Default 'feedback'. */
   label?: string;
+  /** The sentence the issues pages show for where issues go. Default names the repository and the mirror folder. */
+  destination?: string;
   apiUrl?: string;
   fetch?: typeof fetch;
   /** Longest rate-limit wait taken inline; a longer one is handed to the ingester's backoff. Default 60 s. */
@@ -80,10 +105,9 @@ export function githubStore(options: GitHubStoreOptions): FeedbackStore & { file
   const pictures: GitHubAttachments = options.attachments ?? { mode: 'local' };
   const files = fileStore({ dir: options.dir, now });
   const syncFile = join(files.root, '.github-sync.json');
-  const token = () => options.token ?? process.env.FEEDBACK_GITHUB_TOKEN ?? process.env.GITHUB_TOKEN ?? '';
+  const token = () => (typeof options.token === 'function' ? options.token() : options.token)
+    ?? process.env.FEEDBACK_GITHUB_TOKEN ?? process.env.GITHUB_TOKEN ?? '';
   let lastWrite = 0;
-  let assetsPrivate: boolean | null = null;
-  let warnedPublic = false;
 
   /** One REST call, with rate limits handled: short waits inline, long ones handed back as RetryLaterError. */
   async function gh<T>(method: string, path: string, body?: unknown): Promise<{ status: number; data: T; link: string | null }> {
@@ -149,25 +173,32 @@ export function githubStore(options: GitHubStoreOptions): FeedbackStore & { file
     return null;
   }
 
-  async function uploadable(): Promise<boolean> {
-    if (pictures.mode !== 'repo') return false;
-    if (pictures.allowPublic) return true;
-    if (assetsPrivate === null) {
-      const r = await gh<{ private?: boolean }>('GET', `/repos/${pictures.repo}`);
-      assetsPrivate = ok(r, 'attachments repository lookup').private === true;
-    }
-    if (!assetsPrivate && !warnedPublic) {
-      warnedPublic = true;
-      console.warn(`[feedback] ${pictures.repo} is not private; screenshots stay on this server (set allowPublic to override).`);
-    }
-    return assetsPrivate;
+  /**
+   * The pictures' branch, made on first use with no parent: one commit holding a README, so it shares
+   * nothing with the repository's code. False when the branch was there after all (the 404 meant
+   * something else, which the retried upload reports).
+   */
+  async function makeAssetsBranch(repo: string, branch: string): Promise<boolean> {
+    const exists = await gh('GET', `/repos/${repo}/git/ref/heads/${encodeURIComponent(branch)}`);
+    if (exists.status === 200) return false;
+    const readme = `# ${branch}\n\nScreenshots and pictures attached to feedback issues, uploaded by feedback-kit.\nNot code: never merge this branch.\n`;
+    const tree = ok(await gh<{ sha: string }>('POST', `/repos/${repo}/git/trees`, {
+      tree: [{ path: 'README.md', mode: '100644', type: 'blob', content: readme }],
+    }), 'pictures branch tree');
+    const commit = ok(await gh<{ sha: string }>('POST', `/repos/${repo}/git/commits`, {
+      message: 'feedback-kit: pictures branch', tree: tree.sha, parents: [],
+    }), 'pictures branch commit');
+    const ref = await gh('POST', `/repos/${repo}/git/refs`, { ref: `refs/heads/${branch}`, sha: commit.sha });
+    // 422: another process made it a moment ago.
+    if (ref.status !== 422) ok(ref, 'pictures branch');
+    return true;
   }
 
   /** Where each picture is linked from the GitHub issue, in token order; null when it is not linked. */
   async function pictureLinks(draft: IssueDraft, clientId: string, localPaths: string[]): Promise<Array<string | null>> {
     const atts = draft.attachments ?? [];
     if (atts.length === 0) return [];
-    if (pictures.mode === 'repo' && await uploadable()) {
+    if (pictures.mode === 'repo') {
       const base = (pictures.path ?? 'feedback').replace(/^\/|\/$/g, '');
       const links: Array<string | null> = [];
       const referenced = referencedSlots(draft.body, draft.tokenOffset ?? 0);
@@ -175,14 +206,26 @@ export function githubStore(options: GitHubStoreOptions): FeedbackStore & { file
         // A dropped image the body no longer points at stays local: only what the report shows leaves.
         if (atts[i]!.kind === 'image' && !referenced.has(i)) { links.push(null); continue; }
         const file = `${base}/${clientId}/${localPaths[i]!.split('/').pop()}`;
-        const put = await gh<{ content?: { html_url?: string } }>('PUT', `/repos/${pictures.repo}/contents/${file.split('/').map(encodeURIComponent).join('/')}`, {
+        const upload = () => gh<{ content?: { html_url?: string } }>('PUT', `/repos/${pictures.repo}/contents/${file.split('/').map(encodeURIComponent).join('/')}`, {
           message: `feedback-kit: picture for ${clientId}`,
           content: Buffer.from(atts[i]!.bytes).toString('base64'),
           ...(pictures.branch ? { branch: pictures.branch } : {}),
         });
+        let put = await upload();
+        if (put.status === 404 && pictures.branch && await makeAssetsBranch(pictures.repo, pictures.branch)) put = await upload();
         // 422 here means the file is already there: a retry after an upload that did land. Same bytes.
         if (put.status !== 422) ok(put, 'picture upload');
         links.push(`https://github.com/${pictures.repo}/blob/${pictures.branch ?? 'HEAD'}/${file}?raw=true`);
+      }
+      return links;
+    }
+    if (pictures.mode === 'custom') {
+      const referenced = referencedSlots(draft.body, draft.tokenOffset ?? 0);
+      const links: Array<string | null> = [];
+      for (let i = 0; i < atts.length; i += 1) {
+        const a = atts[i]!;
+        if (a.kind === 'image' && !referenced.has(i)) { links.push(null); continue; }
+        links.push(await pictures.upload({ clientId, name: localPaths[i]!.split('/').pop()!, kind: a.kind, contentType: a.contentType, bytes: a.bytes }));
       }
       return links;
     }
@@ -236,7 +279,7 @@ export function githubStore(options: GitHubStoreOptions): FeedbackStore & { file
   const store = {
     kind: 'github',
     files,
-    destination: `GitHub issues in ${options.repo}, mirrored in ${options.dir}`,
+    destination: options.destination ?? `GitHub issues in ${options.repo}, mirrored in ${options.dir}`,
 
     // Serial per mirror, so two passes cannot both miss the marker and both create.
     create: (draft: IssueDraft) => serially(files.root, async (): Promise<Issue & { repeat?: boolean }> => {
@@ -307,7 +350,8 @@ export function githubStore(options: GitHubStoreOptions): FeedbackStore & { file
           const local = await files.get(padId(gi.number));
           if (!local) continue;
           const names = labelNames(gi.labels);
-          const labelled = names.map((l) => /^status:(.+)$/.exec(l)?.[1]).find((s): s is IssueStatus => (STATUSES as readonly string[]).includes(s ?? ''));
+          // Reopening on GitHub leaves our status:done label behind; an open issue is never done.
+          const labelled = names.map((l) => /^status:(.+)$/.exec(l)?.[1]).find((s): s is IssueStatus => s !== 'done' && (STATUSES as readonly string[]).includes(s ?? ''));
           const status: IssueStatus = gi.state === 'closed' ? 'done' : labelled ?? (local.status === 'done' ? 'open' : local.status);
           const priority = (names.map((l) => /^priority:(P[0-3])$/.exec(l)?.[1]).find(Boolean) ?? local.priority) as IssuePriority;
           const kind = (names.map((l) => /^kind:(bug|request|question|chore)$/.exec(l)?.[1]).find(Boolean) ?? local.kind) as Issue['kind'];
