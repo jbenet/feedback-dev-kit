@@ -35,7 +35,23 @@ export type GitHubAttachments =
    */
   | { mode: 'repo'; repo: string; branch?: string; path?: string }
   /** Pictures stay on this server and the issue only says how many there are. */
-  | { mode: 'none' };
+  | { mode: 'none' }
+  /**
+   * Your own transport (S3 or another bucket, a CDN, a GitHub release asset, an image host): called
+   * once per picture the report shows, returning the URL the issue embeds, or null to keep that one
+   * local. Throw to retry the whole report later.
+   */
+  | { mode: 'custom'; upload: (picture: PictureUpload) => Promise<string | null> };
+
+/** One picture on its way out, for a custom transport. */
+export interface PictureUpload {
+  clientId: string;
+  /** Its name in the local mirror, e.g. `report-screenshot.png`, `report-image-1.png`. */
+  name: string;
+  kind: 'screenshot' | 'image';
+  contentType: string;
+  bytes: Uint8Array;
+}
 
 export interface GitHubStoreOptions {
   /** `owner/name` of the repository that gets the issues. */
@@ -200,6 +216,16 @@ export function githubStore(options: GitHubStoreOptions): FeedbackStore & { file
         // 422 here means the file is already there: a retry after an upload that did land. Same bytes.
         if (put.status !== 422) ok(put, 'picture upload');
         links.push(`https://github.com/${pictures.repo}/blob/${pictures.branch ?? 'HEAD'}/${file}?raw=true`);
+      }
+      return links;
+    }
+    if (pictures.mode === 'custom') {
+      const referenced = referencedSlots(draft.body, draft.tokenOffset ?? 0);
+      const links: Array<string | null> = [];
+      for (let i = 0; i < atts.length; i += 1) {
+        const a = atts[i]!;
+        if (a.kind === 'image' && !referenced.has(i)) { links.push(null); continue; }
+        links.push(await pictures.upload({ clientId, name: localPaths[i]!.split('/').pop()!, kind: a.kind, contentType: a.contentType, bytes: a.bytes }));
       }
       return links;
     }

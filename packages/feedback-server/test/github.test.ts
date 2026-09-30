@@ -276,3 +276,18 @@ test('repo mode makes a missing pictures branch once, with no parent, then uploa
   await store.create(draft({ clientId: id() }));
   assert.equal(gh.log.filter((r) => r.path === '/repos/acme/assets/git/refs').length, 1);
 });
+
+test('custom mode hands each picture the report shows to your transport and embeds the URL it returns', async (t) => {
+  const dir = await tempDir(t);
+  const gh = fakeGitHub();
+  const sent: string[] = [];
+  const store = base(dir, gh, { attachments: { mode: 'custom', upload: async (p: { name: string; kind: string; bytes: Uint8Array }) => {
+    assert.ok(p.bytes.length > 0);
+    sent.push(`${p.kind}:${p.name}`);
+    return p.kind === 'screenshot' ? `https://cdn.test/${p.name}` : null;
+  } } });
+  await store.create(draft());
+  assert.deepEqual(sent, ['screenshot:report-screenshot.png', 'image:report-image-1.png']);
+  assert.match(gh.issues[0]!.body, /!\[Screenshot\]\(https:\/\/cdn\.test\/report-screenshot\.png\)/);
+  assert.match(gh.issues[0]!.body, /kept on the server/);
+});

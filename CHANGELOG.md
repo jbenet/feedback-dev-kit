@@ -24,6 +24,9 @@ Both packages share one version.
   base label (default `feedback`); `FEEDBACK_APP_URL` the address the picture links use.
 - `githubStore`: `token` may be a function, asked before each request; `destination` sets the sentence
   the issues pages show.
+- `githubStore` `custom` pictures: `upload(picture)` sends each picture wherever you choose and returns
+  the URL the issue embeds. The README says why GitHub's own drag-and-drop upload cannot be used
+  from a server (no API; it needs a browser session).
 - `githubStore` `repo` pictures: a `branch` that does not exist is created on first use, with no parent
   (one README commit), so pictures never share history with the code. The private-repository check
   (`allowPublic`) is gone: the repository you name is the one used.

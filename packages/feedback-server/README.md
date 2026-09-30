@@ -277,9 +277,44 @@ history after the issue is closed or deleted. Choose the mode deliberately:
 | `local` (default) | Stay on your server. With `baseUrl`, the issue links to your `/api/issues/attachments/…` route, which requires your app's own auth. | People who can sign in to your app |
 | `repo` | Uploaded to `path/<clientId>/` in `repo`, on `branch` (made on first use with no shared history, when it does not exist) or the default branch. Uses the REST contents API with the token (Contents: read and write), no git checkout. Only pictures the body still shows are uploaded; images removed from the text stay local. | Whoever can read that repository, and its history forever |
 | `none` | Stay on your server. The issue says only how many there are. | Nobody on GitHub |
+| `custom` | Handed to your `upload(picture)`, which stores it anywhere and returns the URL the issue embeds (or null to keep that one local). Only pictures the body still shows are handed over. | Whoever can open the URL you return |
 
 The report text always goes to GitHub. Do not use this store for apps whose screens or reports carry
 confidential data.
+
+**Getting pictures to GitHub another way.** The kit uses `repo` because it works with the issue token
+alone. GitHub's web interface puts dragged-in pictures on `github.com/user-attachments/…`, but that
+upload has no public API and only accepts a signed-in browser session, not a token, so a server
+cannot use it. To send pictures somewhere else — your own bucket or CDN, a GitHub release asset
+(`POST https://uploads.github.com/repos/{owner}/{repo}/releases/{id}/assets`, also Contents: write), an
+image host — pass `custom` and do the upload yourself:
+
+```ts
+import { githubStore, type PictureUpload } from '@jbenet/feedback-server/github';
+import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+
+const s3 = new S3Client({});
+const store = githubStore({
+  repo: 'acme/app',
+  dir: 'data/issues',
+  attachments: {
+    mode: 'custom',
+    // Called once per picture the report shows. Return the URL the issue embeds, or null to keep
+    // the picture on your server. Throwing retries the whole report later, so a report is never
+    // filed with pictures half sent.
+    upload: async (p: PictureUpload) => {
+      const key = `feedback/${p.clientId}/${p.name}`;
+      await s3.send(new PutObjectCommand({ Bucket: 'acme-feedback', Key: key, Body: p.bytes, ContentType: p.contentType }));
+      return `https://feedback-cdn.acme.example/${key}`;
+    },
+  },
+});
+```
+
+`p` carries `clientId`, `name` (as in the local mirror, `report-screenshot.png`), `kind`
+(`screenshot` or `image`), `contentType` and `bytes`. Keep uploads idempotent by that key: a report
+that fails later is sent again with the same client id and names. The example app picks the mode
+from `FEEDBACK_GITHUB_PICTURES` in `examples/next-app/lib/feedback.ts`; add a branch there for yours.
 
 ## The journal
 

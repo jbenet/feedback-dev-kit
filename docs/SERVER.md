@@ -445,13 +445,14 @@ spends GitHub's rate limit.
 ### 11.3 Screenshots
 
 GitHub has no API for the private user-attachment uploads the web UI uses
-(`user-images.githubusercontent.com`), so there are three honest options:
+(`user-images.githubusercontent.com`), so the store offers three built-in options and a hook for your own:
 
 | Mode | How | Visible to | Trade-off |
 |---|---|---|---|
 | `local` (default) | Pictures stay on your server; the issue links to your attachment route | whoever can pass your app's auth | GitHub readers without app access see broken links, which is the point |
 | `repo` | `PUT /repos/{owner}/{assets}/contents/{path}/{clientId}/report-screenshot.png` (and `report-image-N.ext`) into a repository you name (`path` defaults to `feedback`), on `branch` if given (created on first use as an orphan branch holding only a README, so the pictures never mix with code), linked from the issue | whoever can read that repository | Needs Contents: write (REST API with the token; no git checkout). **A dropped image the body no longer shows is never uploaded**: only what the report shows leaves your server. A picture committed to git **stays in its history** after the issue is closed or deleted; removing it takes a history rewrite. |
 | `none` | Pictures stay local; the issue says how many there are | nobody on GitHub | Safest; the issue alone is often too thin to act on |
+| `custom` | Your `upload(picture)` stores each picture the body shows (a bucket, a CDN, a release asset) and returns the URL the issue embeds | whoever can open that URL | Your transport, your access rules; see the package README |
 
 **Privacy warning.** A screenshot shows whatever was on the reporter's screen: names, amounts, private
 notes, other people's data. An issue body is readable by everyone who can read the repository, which for

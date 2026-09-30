@@ -32,6 +32,9 @@ automatically). The report text, page and captured context go to GitHub.
 | `upload` | Committed to `FEEDBACK_GITHUB_PICTURES_REPO` (default: the issues repository) on the branch `FEEDBACK_GITHUB_PICTURES_BRANCH` (default `feedback-pictures`, created on first use with no shared history), and shown inline in the issue. | **Contents: read and write** on that repository |
 | `none` | Stay on this server; the issue says how many there are. | nothing |
 
+To get pictures to GitHub some other way (your own bucket or CDN, a release asset), use the store's
+`custom` mode: see "Getting pictures to GitHub another way" in
+[the server package's README](../../packages/feedback-server/README.md#files--github-issues).
 An uploaded picture stays in that branch's git history after the issue is closed. Upload only from
 apps whose screens carry nothing confidential, and to a private repository when you can.
 

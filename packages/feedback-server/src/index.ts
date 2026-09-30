@@ -13,7 +13,7 @@ export { anthropicTitle, defaultGenerateTitle, DEFAULT_TITLE_MODEL, type Generat
 export { fileStore, type FileStore, type FileStoreOptions } from './stores/files.ts';
 export { parseIssue, serializeIssue, slugify, type ParsedIssue } from './stores/format.ts';
 export { sqlStore, migrate, MIGRATIONS, pgDriver, sqliteDriver, type SqlStoreOptions, type SqlDriver, type Migration } from './stores/sql.ts';
-export { githubStore, rateLimitWait, marker, type GitHubStoreOptions, type GitHubAttachments } from './stores/github.ts';
+export { githubStore, rateLimitWait, marker, type GitHubStoreOptions, type GitHubAttachments, type PictureUpload } from './stores/github.ts';
 export {
   neutralize, screenText, patternScreen, flagNote,
   type Neutralized, type ScreenInput, type ScreenVerdict, type ScreenReport,
