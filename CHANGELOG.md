@@ -25,7 +25,8 @@ Both packages share one version.
 - `githubStore`: `token` may be a function, asked before each request; `destination` sets the sentence
   the issues pages show.
 - `githubStore` `repo` pictures: a `branch` that does not exist is created on first use, with no parent
-  (one README commit), so pictures never share history with the code.
+  (one README commit), so pictures never share history with the code. The private-repository check
+  (`allowPublic`) is gone: the repository you name is the one used.
 - `githubStore` sync: an issue reopened on GitHub comes back as open. GitHub keeps the `status:done`
   label on reopen, and sync used to read it and leave the mirror at done.
 

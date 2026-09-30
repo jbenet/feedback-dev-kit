@@ -275,7 +275,7 @@ history after the issue is closed or deleted. Choose the mode deliberately:
 | `attachments.mode` | Pictures | Readable by |
 |---|---|---|
 | `local` (default) | Stay on your server. With `baseUrl`, the issue links to your `/api/issues/attachments/…` route, which requires your app's own auth. | People who can sign in to your app |
-| `repo` | Uploaded to `path/<clientId>/` in `repo`, on `branch` (made on first use with no shared history, when it does not exist) or the default branch. That repository must be private: the store checks, and if it is public the pictures stay local unless you set `allowPublic`. Only pictures the body still shows are uploaded; images removed from the text stay local. | Collaborators on that repository, and its history forever |
+| `repo` | Uploaded to `path/<clientId>/` in `repo`, on `branch` (made on first use with no shared history, when it does not exist) or the default branch. Uses the REST contents API with the token (Contents: read and write), no git checkout. Only pictures the body still shows are uploaded; images removed from the text stay local. | Whoever can read that repository, and its history forever |
 | `none` | Stay on your server. The issue says only how many there are. | Nobody on GitHub |
 
 The report text always goes to GitHub. Do not use this store for apps whose screens or reports carry

@@ -64,7 +64,7 @@ function makeStore(): FeedbackStore {
  *   link (default)  they stay on this server; the issue links to them at FEEDBACK_APP_URL, behind the sign-in
  *   upload          committed to FEEDBACK_GITHUB_PICTURES_REPO (default: the issues repository) on the branch
  *                   FEEDBACK_GITHUB_PICTURES_BRANCH (default feedback-pictures, made on first use), and shown
- *                   in the issue. A public repository is refused unless FEEDBACK_GITHUB_PICTURES_PUBLIC=1.
+ *                   in the issue.
  *   none            they stay on this server; the issue says how many there are
  */
 function githubPictures(repo: string): GitHubAttachments {
@@ -75,7 +75,6 @@ function githubPictures(repo: string): GitHubAttachments {
       mode: 'repo',
       repo: process.env.FEEDBACK_GITHUB_PICTURES_REPO || repo,
       branch: process.env.FEEDBACK_GITHUB_PICTURES_BRANCH || 'feedback-pictures',
-      allowPublic: process.env.FEEDBACK_GITHUB_PICTURES_PUBLIC === '1',
     };
   }
   if (mode !== 'link') console.warn(`[feedback] FEEDBACK_GITHUB_PICTURES=${mode} is not link, upload or none; using link.`);

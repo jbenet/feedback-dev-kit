@@ -175,9 +175,9 @@ test('rate limits: a short wait is taken inline (measured against GitHub\'s cloc
   assert.equal(rateLimitWait(new Headers({ 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '1', date: new Date().toUTCString() })), 1_000);
 });
 
-test('repo mode uploads only pictures the report shows, to a private repository; a public one keeps them local', async (t) => {
+test('repo mode uploads only pictures the report shows; none keeps them all local', async (t) => {
   const dir = await tempDir(t);
-  const gh = fakeGitHub({ assetsPrivate: true });
+  const gh = fakeGitHub();
   const store = base(dir, gh, { attachments: { mode: 'repo', repo: 'acme/assets', path: 'feedback', branch: 'main' } });
   const d = draft();
   await store.create(d);
@@ -185,17 +185,6 @@ test('repo mode uploads only pictures the report shows, to a private repository;
     `feedback/${d.clientId}/report-image-1.png`, `feedback/${d.clientId}/report-screenshot.png`,
   ]);
   assert.match(gh.issues[0]!.body, /https:\/\/github\.com\/acme\/assets\/blob\/main\/feedback\/.+\/report-screenshot\.png\?raw=true/);
-
-  const dir2 = await tempDir(t);
-  const pub = fakeGitHub({ assetsPrivate: false });
-  const warn = console.warn;
-  console.warn = () => undefined;
-  t.after(() => { console.warn = warn; });
-  const store2 = base(dir2, pub, { attachments: { mode: 'repo', repo: 'acme/assets' } });
-  await store2.create(draft());
-  assert.equal(pub.contents.size, 0);
-  assert.match(pub.issues[0]!.body, /kept on the server/);
-  assert.doesNotMatch(pub.issues[0]!.body, /!\[Screenshot\]/);
 
   const dir3 = await tempDir(t);
   const none = fakeGitHub();
@@ -277,7 +266,7 @@ test('a token function is asked on each request, so a token that arrives later (
 
 test('repo mode makes a missing pictures branch once, with no parent, then uploads to it', async (t) => {
   const dir = await tempDir(t);
-  const gh = fakeGitHub({ assetsPrivate: true });
+  const gh = fakeGitHub();
   const store = base(dir, gh, { attachments: { mode: 'repo', repo: 'acme/assets', branch: 'feedback-pictures' } });
   const d = draft();
   await store.create(d);

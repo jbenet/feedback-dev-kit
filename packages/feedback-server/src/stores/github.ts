@@ -13,8 +13,8 @@
  * An issue body is readable by everyone who can read the repository — the whole internet, for a
  * public one — and a picture uploaded to GitHub stays in its git history after the issue is closed
  * or deleted. So the default keeps pictures on your server ('local') and links to them there.
- * 'repo' uploads them to a repository you name, which must be private (checked; a public one is
- * refused and the pictures stay local). 'none' keeps them local and only counts them in the issue.
+ * 'repo' uploads them to a repository you name, readable by whoever can read it. 'none' keeps them
+ * local and only counts them in the issue.
  */
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
@@ -29,11 +29,11 @@ export type GitHubAttachments =
   /** Pictures stay on this server. With `baseUrl`, the issue links to them (behind your app's own auth). */
   | { mode: 'local'; baseUrl?: string }
   /**
-   * Uploaded to a private repository's contents under `path/<clientId>/`. A `branch` that does not
+   * Uploaded to a repository's contents under `path/<clientId>/`, through the REST API with the token. A `branch` that does not
    * exist yet is created with no history of its own (just a README), so the pictures stay off your
    * code's branches.
    */
-  | { mode: 'repo'; repo: string; branch?: string; path?: string; allowPublic?: boolean }
+  | { mode: 'repo'; repo: string; branch?: string; path?: string }
   /** Pictures stay on this server and the issue only says how many there are. */
   | { mode: 'none' };
 
@@ -92,8 +92,6 @@ export function githubStore(options: GitHubStoreOptions): FeedbackStore & { file
   const token = () => (typeof options.token === 'function' ? options.token() : options.token)
     ?? process.env.FEEDBACK_GITHUB_TOKEN ?? process.env.GITHUB_TOKEN ?? '';
   let lastWrite = 0;
-  let assetsPrivate: boolean | null = null;
-  let warnedPublic = false;
 
   /** One REST call, with rate limits handled: short waits inline, long ones handed back as RetryLaterError. */
   async function gh<T>(method: string, path: string, body?: unknown): Promise<{ status: number; data: T; link: string | null }> {
@@ -159,20 +157,6 @@ export function githubStore(options: GitHubStoreOptions): FeedbackStore & { file
     return null;
   }
 
-  async function uploadable(): Promise<boolean> {
-    if (pictures.mode !== 'repo') return false;
-    if (pictures.allowPublic) return true;
-    if (assetsPrivate === null) {
-      const r = await gh<{ private?: boolean }>('GET', `/repos/${pictures.repo}`);
-      assetsPrivate = ok(r, 'attachments repository lookup').private === true;
-    }
-    if (!assetsPrivate && !warnedPublic) {
-      warnedPublic = true;
-      console.warn(`[feedback] ${pictures.repo} is not private; screenshots stay on this server (set allowPublic to override).`);
-    }
-    return assetsPrivate;
-  }
-
   /**
    * The pictures' branch, made on first use with no parent: one commit holding a README, so it shares
    * nothing with the repository's code. False when the branch was there after all (the 404 meant
@@ -198,7 +182,7 @@ export function githubStore(options: GitHubStoreOptions): FeedbackStore & { file
   async function pictureLinks(draft: IssueDraft, clientId: string, localPaths: string[]): Promise<Array<string | null>> {
     const atts = draft.attachments ?? [];
     if (atts.length === 0) return [];
-    if (pictures.mode === 'repo' && await uploadable()) {
+    if (pictures.mode === 'repo') {
       const base = (pictures.path ?? 'feedback').replace(/^\/|\/$/g, '');
       const links: Array<string | null> = [];
       const referenced = referencedSlots(draft.body, draft.tokenOffset ?? 0);
