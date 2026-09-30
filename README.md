@@ -28,17 +28,21 @@ Pick a part of the page, with a mouse or a finger:
 
 ![Region picker after a finger drag](docs/screenshots/10-region-touch.png)
 
-Write in rich text; drop or paste images; the source is markdown:
+Draw on a screenshot to point at the problem:
 
-![The description field](docs/screenshots/07-markdown.png)
+![Annotating a screenshot](docs/screenshots/11-annotate.png)
 
-When the server cannot be reached, reports wait in the browser and resend themselves:
+File it and keep going: the box stays open with the issue number, for the next report:
 
-![The outbox](docs/screenshots/15-outbox-offline.png)
+![The filed screen, two reports in a row](docs/screenshots/23-filed.png)
 
-The issues page, with filters and local search (`/`):
+Each issue keeps the page as it looked, the words and the captured context:
 
-![The issues list, searched](docs/screenshots/19-search.png)
+![An issue, with its screenshot](docs/screenshots/17-issue-detail.png)
+
+The issues page: counts by priority, velocity, filters and local search (`/`):
+
+![The issues list](docs/screenshots/16-issues.png)
 
 More in [docs/FEATURES.md](docs/FEATURES.md).
 

@@ -244,7 +244,11 @@ server: reason", and **Filed as issue N** once the number is known, with a thank
 buttons: **Give more feedback** (focused; also ⌘/Ctrl+Enter) gives a fresh box on the same page with
 a new automatic screenshot; **Open the issue** links to it once it has a number; **Close** (also
 Esc). From the second report on, a list under them, "Filed while this was open · N", has a row per
-report, linked once numbered. Behind File:
+report, linked once numbered.
+
+![The filed screen after two reports in a row](screenshots/23-filed.png)
+
+Behind File:
 
 1. The report goes into this browser's **outbox** (IndexedDB, one record per report, pictures
    included) under a fresh **client id**, the idempotency key.
