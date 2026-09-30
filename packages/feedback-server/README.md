@@ -212,11 +212,13 @@ const store = githubStore({
 });
 ```
 
-- **Token.** The `token` option (a string, or a function asked before each request, for a GitHub App's
-  rotating token or one that arrives after start), else `FEEDBACK_GITHUB_TOKEN`, then `GITHUB_TOKEN`. Use a fine-grained token or a
-  GitHub App token for this one repository, with Issues read/write and Metadata read. Add Contents
-  read/write only for `repo` pictures, and only on the assets repository. With no token, reports wait
-  in the journal.
+- **Token.** Set `FEEDBACK_GITHUB_TOKEN` in the server's environment (`GITHUB_TOKEN` is read too).
+  Least privilege: create a [fine-grained personal access token](https://github.com/settings/personal-access-tokens/new)
+  (or a GitHub App installation token) for this one repository with **Issues: read and write**;
+  Metadata: read comes with it. Add Contents: read and write only for `repo` pictures, and only on
+  the assets repository. Avoid classic tokens: `repo` scope reaches every repository you can. The
+  `token` option overrides the environment, as a string or a function asked before each request (for
+  a GitHub App's rotating token). With no token, reports wait in the journal.
 - **Issues.** Each report becomes an issue with the labels `feedback`, `kind:*`, `priority:*` and
   `status:*`, created on first use. The reporter, page and captured context go in the body, with a
   hidden `<!-- feedback-kit client_id: … -->` marker. A body over 65,536 characters is cut with a note;

@@ -19,14 +19,15 @@ called).
 
 **File to GitHub instead.** With `FEEDBACK_GITHUB_REPO` set, reports become GitHub issues in that
 repository (the server package's `githubStore`), mirrored locally in `FEEDBACK_DATA/github`, which the
-issues pages read. The token is `FEEDBACK_GITHUB_TOKEN`, then `GITHUB_TOKEN`, then your `gh auth login`,
-so the issues are filed as you. Screenshots stay on this server; the issue links to them at
-`FEEDBACK_APP_URL` (default `http://localhost:$PORT`), behind the demo sign-in. The report text,
-page and captured context do go to GitHub.
+issues pages read. Give the server a token in `FEEDBACK_GITHUB_TOKEN`: a
+[fine-grained personal access token](https://github.com/settings/personal-access-tokens/new) limited
+to that one repository, with **Issues: read and write** and nothing else (Metadata: read is added
+automatically). Screenshots stay on this server; the issue links to them at `FEEDBACK_APP_URL`
+(default `http://localhost:$PORT`), behind the app's sign-in. The report text, page and captured
+context do go to GitHub.
 
 ```sh
-gh auth login                                           # once, or set FEEDBACK_GITHUB_TOKEN
-FEEDBACK_GITHUB_REPO=jbenet/feedback-dev-kit FEEDBACK_GITHUB_LABEL=feedback-test npm run dev
+FEEDBACK_GITHUB_REPO=owner/name FEEDBACK_GITHUB_TOKEN=github_pat_… npm run dev
 ```
 
 `FEEDBACK_GITHUB_LABEL` replaces the base `feedback` label (useful to keep test issues apart); every

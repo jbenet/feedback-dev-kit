@@ -3,10 +3,9 @@
  *
  * Reports are journaled under FEEDBACK_DATA (default .data/) and filed by the ingester, which runs in
  * this process: as markdown files by default, or as GitHub issues when FEEDBACK_GITHUB_REPO is set
- * (see githubToken below for the token). No model is called for titles here (generateTitle: null),
+ * (the token is FEEDBACK_GITHUB_TOKEN; see packages/feedback-server/README.md). No model is called for titles here (generateTitle: null),
  * so a title is the first sentence of the report; set one up per packages/feedback-server/README.md.
  */
-import { execFileSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 import { createFeedbackHandler, fileStore, startIngester, type FeedbackHandler, type FeedbackStore } from '@jbenet/feedback-server';
 import { githubStore } from '@jbenet/feedback-server/github';
@@ -55,33 +54,10 @@ function makeStore(): FeedbackStore {
     repo,
     destination: `GitHub issues in ${repo}, mirrored in ${shownRoot}/github`,
     dir: githubDir,
-    token: githubToken,
     label: process.env.FEEDBACK_GITHUB_LABEL || undefined,
     // Pictures stay on this server; the issue links to them through this app's own (signed-in) route.
     attachments: { mode: 'local', baseUrl: `${appUrl()}/api/issues` },
   });
-}
-
-/**
- * FEEDBACK_GITHUB_TOKEN, then GITHUB_TOKEN; failing both, the GitHub CLI's login (`gh auth token`), so
- * the example files issues as whoever ran `gh auth login` on this machine. A deployed app sets a
- * fine-grained token for the one repository instead (packages/feedback-server/README.md).
- * Asked again on each pass until there is one: reports wait in the journal and file once you log in.
- */
-let ghToken: string | undefined;
-let warnedNoToken = false;
-function githubToken(): string | undefined {
-  const fromEnv = process.env.FEEDBACK_GITHUB_TOKEN || process.env.GITHUB_TOKEN;
-  if (fromEnv) return fromEnv;
-  if (ghToken) return ghToken;
-  try {
-    ghToken = execFileSync('gh', ['auth', 'token'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5_000 }).trim() || undefined;
-  } catch { /* not installed, or not logged in */ }
-  if (!ghToken && !warnedNoToken) {
-    warnedNoToken = true;
-    console.warn('[feedback] no GitHub token: set FEEDBACK_GITHUB_TOKEN or run `gh auth login`. Reports stay journaled until then.');
-  }
-  return ghToken;
 }
 
 /** Where readers of a GitHub issue reach this app, for the picture links. */

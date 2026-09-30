@@ -6,8 +6,8 @@ Both packages share one version.
 
 - **GitHub issue filing in the example.** Set `FEEDBACK_GITHUB_REPO=owner/name` and the example files
   reports as GitHub issues (`githubStore`) instead of markdown files, mirrored in `.data/github`, with
-  pictures kept on the server and linked from the issue. The token is `FEEDBACK_GITHUB_TOKEN`, then
-  `GITHUB_TOKEN`, then the GitHub CLI's login (`gh auth token`). `FEEDBACK_GITHUB_LABEL` changes the
+  pictures kept on the server and linked from the issue. The token is `FEEDBACK_GITHUB_TOKEN` (a
+  fine-grained token for that one repository, Issues read/write). `FEEDBACK_GITHUB_LABEL` changes the
   base label (default `feedback`); `FEEDBACK_APP_URL` the address the picture links use.
 - `githubStore`: `token` may be a function, asked before each request; `destination` sets the sentence
   the issues pages show.
