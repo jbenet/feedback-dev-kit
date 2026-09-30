@@ -74,6 +74,9 @@
 .fbk .card{background:var(--fbk-surface);border:1px solid var(--fbk-line);border-radius:10px;margin-bottom:16px}
 .fbk .chead{padding:12px 15px;border-bottom:1px solid var(--fbk-line);display:flex;align-items:center;justify-content:space-between;gap:12px}
 .fbk .chead h2{font-family:var(--fbk-display);font-size:16px;font-weight:600;margin:0}
+/* A card's body lines up with its heading (the chead's 15px). An empty state brings its own padding. */
+.fbk .cbody{padding:14px 15px 15px}
+.fbk .cbody:has(> .empty){padding:0}
 .fbk .kind{font-family:var(--fbk-mono);font-size:9.5px;letter-spacing:.08em;padding:3px 7px;border-radius:4px;flex:none;text-align:center}
 .fbk .k-bug{background:#F5EAE4;color:var(--fbk-clay)}
 .fbk .k-request{background:#EAE6F4;color:var(--fbk-purple)}

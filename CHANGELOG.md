@@ -9,8 +9,9 @@ Both packages share one version.
   "Filed as issue N"), with **Give more feedback** (⌘/Ctrl+Enter) for another report from the same
   page, **Open the issue**, and **Close**. From the second report, a list of everything filed while
   the box was open. File still returns at once; `enqueue()` takes an optional `clientId`.
-- **Issue velocity** (issue #8): the chart is drawn at its card's width, so it fills the card on a
-  wide screen instead of sitting in its left half.
+- **Card alignment** (issue #8): card bodies on the issues pages had no padding, so their content sat
+  against the card's left edge instead of under its heading; they now line up. The issue velocity
+  chart is also drawn at its card's width, so it fills the card on a wide screen.
 - **Prompt injection** (issue #6). The ingester neutralizes every report (invisible characters removed,
   HTML comments shown as text) and screens it by patterns; a hit is filed with the `suspicious` label and
   a warning on top, or refused with `onSuspicious: 'refuse'` (the handler then answers 422 with the reason,
