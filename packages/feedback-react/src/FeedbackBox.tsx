@@ -11,7 +11,10 @@ import { MarkdownField, packAttachments, type DroppedImage } from './MarkdownFie
 import {
   configureDrafts, discardDraft, listDrafts, readDraft, readPictures, writeDraft, writePictures, type DraftSummary,
 } from './drafts';
-import { configureOutbox, enqueue, startOutbox } from './outbox';
+import { configureOutbox, enqueue, startOutbox, type OutboxState } from './outbox';
+import { useOutbox } from './FeedbackOutbox';
+import { firstLine } from './journal';
+import { newRequestKey } from './request-key';
 import { currentLocation, themeStyle, useFeedbackConfig, type ResolvedFeedbackConfig } from './config';
 import { savedAt } from './time';
 import { useFocusTrap } from './useSheet';
@@ -210,7 +213,9 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
       }
       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        void submitRef.current?.();
+        // On the filed screen it means another report, never filing the one just sent again.
+        if (stateRef.current === 'saved') againRef.current?.();
+        else void submitRef.current?.();
       }
       if (isShortcutsKey(e)) {
         e.preventDefault();
@@ -326,6 +331,29 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
   );
 
   const submitRef = useRef<(() => Promise<void>) | null>(null);
+  const againRef = useRef<(() => void) | null>(null);
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  /**
+   * Reports filed while the box has been open, newest last, with the number each got. The outbox
+   * shows a filed number only for a few seconds, so each one is recorded here as it is reported.
+   */
+  const [filedHere, setFiledHere] = useState<FiledHere[]>([]);
+  const outbox = useOutbox();
+  useEffect(() => {
+    setFiledHere((prev) => {
+      let changed = false;
+      const next = prev.map((f) => {
+        const seen = standing(outbox, f);
+        if (seen.id === f.id && seen.where === f.where) return f;
+        changed = true;
+        return { ...f, ...seen };
+      });
+      return changed ? next : prev;
+    });
+  }, [outbox]);
+  const current = filedHere.at(-1);
 
   /**
    * File it. The report is kept in this browser first (outbox.ts), then posted with a 3 s timeout;
@@ -338,10 +366,14 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
     if (!body.trim()) return;
     if (state !== 'idle' && state !== 'failed') return;
     if (imagesPending || hydrating.current) return;
-    setState('saving');
     setError(null);
     // A picture deleted from the text is not sent — it may be the wrong one.
     const packed = packAttachments(body, images);
+    // The filed screen shows at once: nothing waits on the server. Where the report stands is read
+    // from the outbox by this key as it moves (sending, on the server, filed).
+    const clientId = newRequestKey();
+    setFiledHere((prev) => [...prev, { clientId, title: firstLine(packed.body) || 'Report', id: null, where: 'Sending…', refused: false }]);
+    setState('saved');
     try {
       await enqueue({
         body: packed.body, kind, priority, page: path, context,
@@ -350,18 +382,33 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
         // The server numbers attachments with the screenshots first, so a body written against
         // `attachment:1` needs an offset for the screenshots still attached.
         imageOffset: shots.length,
-      });
+      }, { clientId });
     } catch (err) {
+      // Neither this browser nor the server kept it: back to the words, with the reason.
+      setFiledHere((prev) => prev.filter((f) => f.clientId !== clientId));
       setError(err instanceof Error ? err.message : String(err));
       setState('failed');
       return;
     }
-    // Kept in the outbox now: the draft goes, and nothing autosaves it back on the way out.
-    setState('saved');
+    // Kept in the outbox now: the draft goes, and nothing autosaves it back while the filed screen shows.
     void discardDraft(draftPage);
-    onClose();
   };
   submitRef.current = submit;
+
+  /** Another report from the same page: a fresh box, a new automatic screenshot. */
+  const again = () => {
+    setBody('');
+    setImages([]);
+    setShots([]);
+    setFailed(false);
+    setRestored(null);
+    setError(null);
+    setDraftPage(path);
+    setGeneration((g) => g + 1);
+    setState('idle');
+    seedShot();
+  };
+  againRef.current = again;
 
   const ui = (
     <div className="fbk nocapture" style={themeStyle(config.theme)}>
@@ -424,6 +471,16 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
             {wide ? '⇥ Narrower' : '⇤ Wider'}
           </button>
         </div>
+        {state === 'saved' && current ? (
+          <FiledScreen
+            current={current}
+            all={filedHere}
+            href={config.issueHref}
+            modifier={modifier}
+            onAgain={again}
+            onClose={onClose}
+          />
+        ) : (<>
         {showDrafts && others.length > 0 && state !== 'saved' && (
           <div className="draftlist">
             <div className="lbl">Unsent, kept in this browser · {others.length}</div>
@@ -605,9 +662,80 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
           <summary>Captured with it: the page, its filters and the device</summary>
           <div className="ctx">{JSON.stringify(context, null, 2)}</div>
         </details>
+        </>)}
       </div>
     </div>
   );
 
   return mounted ? createPortal(ui, document.body) : null;
+}
+
+/** A report filed while the box was open, and where it stands. */
+interface FiledHere { clientId: string; title: string; id: string | null; where: string; refused: boolean }
+
+/**
+ * Where one report stands, from the outbox: filed (with its number), refused, still in this browser,
+ * being sent, or on the server waiting to be filed. What the outbox no longer mentions keeps what was
+ * last seen, since a filed number is only on show for a few seconds.
+ */
+function standing(out: OutboxState, f: FiledHere): Pick<FiledHere, 'id' | 'where' | 'refused'> {
+  const filed = out.filed.find((n) => n.clientId === f.clientId);
+  if (filed?.error) return { id: null, where: `Refused by the server: ${filed.error}`, refused: true };
+  if (filed?.id) return { id: filed.id, where: `Filed as issue ${filed.id}`, refused: false };
+  if (filed) return { id: f.id, where: 'Saved on the server', refused: false };
+  const entry = out.entries.find((e) => e.clientId === f.clientId);
+  if (entry?.refused) return { id: null, where: `Refused by the server: ${entry.lastError ?? 'no reason given'}`, refused: true };
+  if (out.sending.includes(f.clientId)) return { id: f.id, where: 'Sending…', refused: false };
+  if (entry) {
+    return { id: null, where: `Kept in this browser${entry.lastError ? ` (${entry.lastError})` : ''} · sent again when the server answers`, refused: false };
+  }
+  if (out.onServer.some((n) => n.clientId === f.clientId)) return { id: f.id, where: 'Saved on the server · being filed', refused: false };
+  return { id: f.id, where: f.where, refused: f.refused };
+}
+
+/**
+ * After File: the drawer stays open on where the report stands, so several can be filed in a row.
+ * "Give more feedback" (and ⌘/Ctrl+Enter) gives a fresh box on the same page.
+ */
+function FiledScreen({ current, all, href, modifier, onAgain, onClose }: {
+  current: FiledHere; all: FiledHere[]; href: (id: string) => string; modifier: string; onAgain: () => void; onClose: () => void;
+}) {
+  const heading = current.id ? `Filed as issue ${current.id}` : current.where;
+  return (
+    <div className="fbfiled" role="status" aria-live="polite">
+      <h3 className={`fbfiledhead${current.refused ? ' refused' : ''}`}>{heading}</h3>
+      {!current.refused && (
+        <p className="muted">
+          Thanks — it is in the queue with this page, your filters and any screenshots attached.
+          {!current.id && ' Its number shows here when the server gives it one; you can close the box before then.'}
+        </p>
+      )}
+      <div className="acts">
+        {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
+        <button type="button" className="btn p" onClick={onAgain} autoFocus>Give more feedback</button>
+        {current.id
+          ? <a className="btn" href={href(current.id)}>Open the issue</a>
+          : <button type="button" className="btn" disabled>Open the issue</button>}
+        <button type="button" className="btn" onClick={onClose}>Close</button>
+      </div>
+      <div className="keyhint">
+        <span><kbd>{modifier}</kbd><kbd>↵</kbd> another</span>
+        <span><kbd>esc</kbd> close</span>
+      </div>
+      {all.length > 1 && (
+        <div className="fbfiledlist">
+          <div className="lbl">Filed while this was open · {all.length}</div>
+          <ul>
+            {all.map((f) => (
+              <li key={f.clientId}>
+                {f.id
+                  ? <a href={href(f.id)}><span className="mono">{f.id}</span> {f.title}</a>
+                  : <span data-tip={f.where} title={f.where}><span className="mono">…</span> {f.title}</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
 }

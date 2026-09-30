@@ -36,6 +36,9 @@ async function dropImage(page: Page, name: string) {
   await page.locator('.mdrichwrap').dispatchEvent('drop', { dataTransfer });
 }
 
+/** The filed screen's heading: where the report just filed stands. */
+const filedHeading = (page: Page) => page.getByRole('dialog', { name: 'Give feedback' }).locator('.fbfiledhead');
+
 /** The rail's status line. */
 const status = (page: Page) => page.locator('.obchip');
 
@@ -115,6 +118,9 @@ test('files a report end to end: shortcut, markdown, dropped file, region shot, 
   expect(request.imageOffset).toBe(2);
   expect(request.context.route).toBe('/reports');
   expect(request.context.filters).toEqual({ region: 'harbor' });
+  // The box stays open on the filed screen; Escape closes it.
+  await expect(filedHeading(page)).toBeVisible();
+  await page.keyboard.press('Escape');
   await expect(box).toBeHidden();
 
   // Journaled on the server at once, then filed; the rail says so.
@@ -186,6 +192,40 @@ test.describe('on a touch screen', () => {
   });
 });
 
+test('the filed screen: several reports in a row without reopening the box', async ({ page }) => {
+  await page.goto('/');
+  const box = await openWithShortcut(page);
+  const firstShot = await box.locator('.shotthumb img').first().getAttribute('src');
+  await page.keyboard.type('First of two invented reports: the late tile flickers');
+  await page.keyboard.press('ControlOrMeta+Enter');
+
+  // Stays open; the number shows when the server gives it one, and Open the issue links to it.
+  await expect(filedHeading(page)).toHaveText(/^Filed as issue \d+$/, { timeout: 20_000 });
+  const first = /(\d+)$/.exec(await filedHeading(page).innerText())![1]!;
+  await expect(box.getByRole('link', { name: 'Open the issue' })).toHaveAttribute('href', `/issues/${first}`);
+  await expect(box.getByRole('button', { name: 'Give more feedback' })).toBeFocused();
+
+  // ⌘/Ctrl+Enter here means "another": an empty box with a new automatic screenshot.
+  await page.keyboard.press('ControlOrMeta+Enter');
+  await expect(editor(page)).toBeVisible();
+  await expect(editor(page)).toHaveText('');
+  await expect(box.locator('.shotthumb img')).toHaveCount(1);
+  expect(await box.locator('.shotthumb img').first().getAttribute('src')).toBeTruthy();
+  expect(firstShot).toBeTruthy();
+
+  await editor(page).focus();
+  await page.keyboard.type('Second of two invented reports: the reports tab is slow');
+  await page.keyboard.press('ControlOrMeta+Enter');
+  await expect(filedHeading(page)).toHaveText(/^Filed as issue \d+$/, { timeout: 20_000 });
+  const list = box.locator('.fbfiledlist');
+  await expect(list.locator('.lbl')).toHaveText('Filed while this was open · 2');
+  await expect(list.getByRole('link')).toHaveCount(2);
+  await expect(list.getByRole('link').first()).toHaveAttribute('href', `/issues/${first}`);
+
+  await page.keyboard.press('Escape');
+  await expect(box).toBeHidden();
+});
+
 test('a draft survives a reload', async ({ page }) => {
   await page.goto('/settings');
   await openWithShortcut(page);
@@ -221,6 +261,8 @@ test('the outbox keeps a report while the server is down and replays it when it 
   const box = await openWithShortcut(page);
   await page.keyboard.type(words);
   await page.keyboard.press('ControlOrMeta+Enter');
+  await expect(filedHeading(page)).toContainText(/Kept in this browser .* sent again when the server answers/);
+  await page.keyboard.press('Escape');
   await expect(box).toBeHidden();
   await expect(status(page)).toContainText('1 report only on this device');
 
@@ -326,6 +368,8 @@ test('signed out, the issues and their pictures are closed; a report still files
   const posted = page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/feedback');
   await page.keyboard.press('ControlOrMeta+Enter');
   expect((await posted).status()).toBe(202);
+  await expect(filedHeading(page)).toBeVisible();
+  await page.getByRole('button', { name: 'Close' }).click();
   await expect(box).toBeHidden();
 
   // Sign in as someone from the rail, and the list is there.

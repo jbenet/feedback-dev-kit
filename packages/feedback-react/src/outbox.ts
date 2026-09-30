@@ -373,10 +373,11 @@ export const flushOutbox = () => { if (started) kick(); };
  * longer for big pictures). `onServer` says whether the server accepted it; if not, it stays here
  * and is resent. Throws only when this browser could keep nothing and the server was not reached.
  */
-export async function enqueue(request: FeedbackRequest): Promise<{ entry: JournalEntry; onServer: boolean }> {
+export async function enqueue(request: FeedbackRequest, options: { clientId?: string } = {}): Promise<{ entry: JournalEntry; onServer: boolean }> {
   startOutbox();
   const entry: JournalEntry = {
-    clientId: newRequestKey(),
+    // A caller that shows where the report stands before the send settles picks the key itself.
+    clientId: options.clientId ?? newRequestKey(),
     createdAt: new Date().toISOString(),
     attempts: 0,
     nextAt: 0,

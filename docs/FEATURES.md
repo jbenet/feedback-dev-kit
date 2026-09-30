@@ -237,7 +237,14 @@ Nothing typed is lost to a reload, a crash or a closed tab.
 
 ## 9. Filing: journaled on the server, outbox in the browser
 
-**File it** (or ⌘/Ctrl+Enter) closes the panel within a fraction of a second. Behind it:
+**File it** (or ⌘/Ctrl+Enter) returns at once: nothing waits on the server. The panel stays open on
+a **filed screen** that says where the report stands: "Sending…", "Saved on the server · being
+filed", "Kept in this browser (reason) · sent again when the server answers", "Refused by the
+server: reason", and **Filed as issue N** once the number is known, with a thank-you line. Three
+buttons: **Give more feedback** (focused; also ⌘/Ctrl+Enter) gives a fresh box on the same page with
+a new automatic screenshot; **Open the issue** links to it once it has a number; **Close** (also
+Esc). From the second report on, a list under them, "Filed while this was open · N", has a row per
+report, linked once numbered. Behind File:
 
 1. The report goes into this browser's **outbox** (IndexedDB, one record per report, pictures
    included) under a fresh **client id**, the idempotency key.
@@ -298,7 +305,8 @@ kit's line covers feedback only.
 ![The app's keyboard shortcuts list](screenshots/18-shortcuts.png)
 
 - **Alt/Option+F** opens the panel (outside text fields and dialogs).
-- **⌘/Ctrl+Enter** files, from anywhere in the panel, including inside the description.
+- **⌘/Ctrl+Enter** files, from anywhere in the panel, including inside the description. On the filed
+  screen it means **Give more feedback**, never filing again.
 - **Esc** closes the keys panel first, then the panel. An open annotator or region picker takes Esc
   first.
 - **Tab / Shift+Tab** move between fields.

@@ -247,6 +247,9 @@ try {
   await shotCount(page, 1);
   await page.keyboard.type('Week 12 returns for Rye look three times too high in the harbor region.');
   await page.keyboard.press('ControlOrMeta+Enter');
+  // The box stays open on the filed screen; close it to show the rail.
+  await box.locator('.fbfiledhead').waitFor();
+  await page.keyboard.press('Escape');
   await box.waitFor({ state: 'hidden' });
   const chip = page.locator('.obchip');
   await chip.filter({ hasText: 'only on this device' }).waitFor();

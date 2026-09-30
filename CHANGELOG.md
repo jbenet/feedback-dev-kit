@@ -4,6 +4,13 @@ Both packages share one version.
 
 ## Unreleased
 
+- **The filed screen** (issue #7). File no longer closes the box: it stays open on where the report
+  stands ("Sending…", "Saved on the server · being filed", "Kept in this browser…", "Refused…",
+  "Filed as issue N"), with **Give more feedback** (⌘/Ctrl+Enter) for another report from the same
+  page, **Open the issue**, and **Close**. From the second report, a list of everything filed while
+  the box was open. File still returns at once; `enqueue()` takes an optional `clientId`.
+- **Issue velocity** (issue #8): the chart is drawn at its card's width, so it fills the card on a
+  wide screen instead of sitting in its left half.
 - **Prompt injection** (issue #6). The ingester neutralizes every report (invisible characters removed,
   HTML comments shown as text) and screens it by patterns; a hit is filed with the `suspicious` label and
   a warning on top, or refused with `onSuspicious: 'refuse'` (the handler then answers 422 with the reason,

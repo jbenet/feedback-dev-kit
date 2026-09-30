@@ -539,3 +539,13 @@ body:has(.shortcuts-dialog[open]) .fbk .feedbackkey{display:inline}
   pointer-events:none}
 .fbk [data-tip][data-tip-end]:hover::after,.fbk [data-tip][data-tip-end]:focus-visible::after{left:auto;right:0;transform:none}
 @media (hover:none){.fbk [data-tip]:hover::after{content:none}}
+
+/* ---------------- the filed screen: where the report stands, and another ---------------- */
+.fbk .fbfiled{padding:8px 0}
+.fbk .fbfiledhead{font-size:20px;margin:4px 0 8px}
+.fbk .fbfiledhead.refused{color:var(--fbk-clay)}
+.fbk .fbfiled .acts{margin-top:16px}
+.fbk .fbfiledlist{margin-top:20px;border-top:1px solid var(--fbk-line);padding-top:12px}
+.fbk .fbfiledlist ul{list-style:none;margin:6px 0 0;padding:0}
+.fbk .fbfiledlist li{padding:4px 0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fbk .fbfiledlist .mono{font-family:var(--fbk-mono);margin-right:6px}

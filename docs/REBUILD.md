@@ -238,10 +238,18 @@ closed ──open (button, Alt+F)──▶ loading-draft ──▶ editing
 editing ──Pick a part──▶ picking ──pick──▶ shooting ──▶ editing (+1 shot)   [cancel ▶ editing]
 editing ──Whole page──▶ shooting ──▶ editing (+1 shot | failed=true)
 editing ──Annotate──▶ annotating ──Done──▶ editing (shot replaced, annotated) [Cancel ▶ editing]
-editing ──File it / ⌘↵──▶ saving ──kept in outbox or on server──▶ saved ──▶ closed (draft discarded)
-                                 └─neither──▶ failed (panel stays, draft kept, reason shown)
+editing ──File it / ⌘↵──▶ filed screen at once (draft discarded once kept in the outbox or on the server)
+                         └─neither kept it──▶ failed (back to editing, draft kept, reason shown)
+filed ──Give more feedback / ⌘↵──▶ editing (empty, new automatic screenshot, same page)
+filed ──Esc / Close──▶ closed
 editing ──Esc / Cancel / scrim──▶ closed (draft kept)
 ```
+
+The filed screen reads where the report stands from the outbox by the client id the box chose for
+it (sending → on the server → filed as N, or kept in this browser / refused), and records each number
+in its own state, since the outbox shows a filed number only for a few seconds. From the second
+report on it lists every report filed while the box has been open. Nothing autosaves a draft while
+it shows.
 
 On open: `load(currentRoute)`. If a draft exists for the route, restore its words at once and, if it
 recorded pictures, clear `shots`, set `hydrating`, read the pictures from IndexedDB, then clear
