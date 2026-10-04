@@ -19,3 +19,7 @@ export {
   type Neutralized, type ScreenInput, type ScreenVerdict, type ScreenReport,
 } from './injection.ts';
 export { anthropicScreen, type AnthropicScreenOptions } from './ai-screen.ts';
+export {
+  feedbackTools, createFeedbackMcp, sendFeedback, FEEDBACK_MCP_VERSION, MCP_PROTOCOL_VERSIONS,
+  type FeedbackMcpOptions, type FeedbackTool, type McpCaller, type ToolResult, type SendFeedbackOptions,
+} from './mcp.ts';

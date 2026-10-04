@@ -19,5 +19,6 @@ import type { FeedbackHandler } from './handlers.ts';
 
 export function nextRoutes(handler: Pick<FeedbackHandler, 'handle'>) {
   const route = (req: Request) => handler.handle(req);
-  return { GET: route, POST: route, PATCH: route };
+  // DELETE: an MCP client ends a session with it (the kit's endpoint has none and answers 405).
+  return { GET: route, POST: route, PATCH: route, DELETE: route };
 }

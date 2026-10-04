@@ -1,7 +1,7 @@
 {
   "name": "@jbenet/feedback-server",
   "version": "0.1.2",
-  "description": "Server side of feedback-kit: a journal-first feedback endpoint, a background ingester and issue stores (files, SQLite/Postgres, GitHub Issues).",
+  "description": "Server side of feedback-kit: a journal-first feedback endpoint, a background ingester and issue stores (files, SQLite/Postgres, GitHub Issues), and feedback over MCP between apps.",
   "license": "MIT",
   "author": "Juan Benet",
   "type": "module",
@@ -37,6 +37,11 @@
       "import": "./dist/stores/github.js",
       "default": "./dist/stores/github.js"
     },
+    "./mcp": {
+      "types": "./dist/mcp.d.ts",
+      "import": "./dist/mcp.js",
+      "default": "./dist/mcp.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
@@ -70,6 +75,7 @@
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.129.0",
     "@electric-sql/pglite": "^0.5.8",
+    "@modelcontextprotocol/sdk": "^1.32.0",
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^26.6.3",
     "@types/pg": "^8.23.1",

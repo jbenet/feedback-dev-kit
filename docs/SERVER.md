@@ -404,6 +404,12 @@ Rules:
 - **Single numbering authority.** A server that is not the filing server answers 403 with a sentence,
   so two servers never hand out the same number.
 
+### Feedback from other apps (MCP)
+
+With `mcp` options the handler also serves `POST /api/feedback/mcp`: the feedback tools over MCP, so
+other apps and their agents can file reports here. They take the same path as the box's: checked,
+journaled, filed, screened. The convention is [MCP.md](MCP.md).
+
 ### Prompt injection
 
 Reports are written by strangers and read by agents. The ingester neutralizes every report (invisible

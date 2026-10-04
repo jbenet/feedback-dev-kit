@@ -14,7 +14,8 @@ Two packages:
   the status line, and the issues pages.
 - **`@jbenet/feedback-server`** (`packages/feedback-server`): a journal-first `POST /api/feedback`
   (written to disk before it answers), a background ingester, AI-generated titles, the issues API, and
-  stores for files, SQLite/Postgres, and GitHub Issues. Next.js and plain Node adapters.
+  stores for files, SQLite/Postgres, and GitHub Issues, and **feedback over MCP** so apps and their
+  agents can report problems to each other ([docs/MCP.md](docs/MCP.md)). Next.js and plain Node adapters.
 
 There is no Title field: titles are generated from the body and screenshots on the server.
 
@@ -224,6 +225,9 @@ What the suite cannot check headless (the exact screen capture, real Safari) is 
   markdown field, keyboard, the issues pages, accessibility, and acceptance tests.
 - [SERVER.md](docs/SERVER.md): the API, the journal, the ingester, the issue file format, the export
   endpoint, security, and the GitHub Issues variant with a comparison.
+- [MCP.md](docs/MCP.md): the standard for apps to give each other feedback over MCP: four tools
+  (`feedback_submit`, `feedback_status`, `feedback_list`, `feedback_get`), the endpoint, discovery,
+  auth, and how to adopt it with or without the kit.
 - [TRIAGE.md](docs/TRIAGE.md): how coding agents triage and fix feedback in the background: four
   classes, roles to outcomes, the feedback-fixer pattern.
 - [PACKAGES.md](docs/PACKAGES.md): dependencies, versions, and why.

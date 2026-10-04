@@ -4,6 +4,13 @@ Both packages share one version.
 
 ## Unreleased
 
+- **Feedback over MCP** ([docs/MCP.md](docs/MCP.md)): a convention for apps and their agents to give
+  each other feedback. Four tools (`feedback_submit`, `feedback_status`, `feedback_list`,
+  `feedback_get`); `createFeedbackHandler({ mcp: { identify } })` serves them at
+  `POST /api/feedback/mcp` (MCP Streamable HTTP, stateless, no dependencies); `feedbackTools()` puts
+  them on an MCP server you already run; `sendFeedback()` reports to another app from code. Reports
+  from other apps go through the same journal, filing and injection screen as the box's. The example
+  serves the endpoint (tokens in `FEEDBACK_MCP_CALLERS`) and `/.well-known/feedback.json`.
 - **Annotator** (issue #10): a **Select** tool (move or delete a mark, or just leave another tool),
   **stroke widths** beside the colors, dark tooltips that are never hidden under the picture, and
   "Color" in US spelling.

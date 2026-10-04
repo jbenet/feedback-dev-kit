@@ -186,6 +186,34 @@ startIngester({ journal, store, screen: anthropicScreen() });   // also reads te
   queue checks again, since an issue can be edited after filing. How agents treat issues is in
   [docs/TRIAGE.md §10](../../docs/TRIAGE.md#10-untrusted-input-prompt-injection).
 
+### Feedback over MCP
+
+Other apps and their agents give this one feedback through four MCP tools (`feedback_submit`,
+`feedback_status`, and for callers allowed to read, `feedback_list` and `feedback_get`). The
+convention, for apps with or without the kit, is [docs/MCP.md](../../docs/MCP.md).
+
+```ts
+createFeedbackHandler({
+  journal, store,
+  mcp: {
+    app: { name: 'orchard-street', version: '1.4.0' },
+    about: 'An order and delivery app for a bakery.',
+    identify: (req) => callerForToken(req.headers.get('authorization')),   // { name, canRead? } or null (401)
+  },
+});                                                                         // serves POST /api/feedback/mcp
+```
+
+- `createFeedbackMcp(options)`: the same endpoint on its own: MCP Streamable HTTP, stateless, JSON
+  answers, no dependencies. `feedbackTools(options)`: the four tools as definitions plus `call(args,
+  caller)`, to register on an MCP server you already run.
+- A report comes in exactly like one from the box: checked, journaled, filed by the ingester, screened
+  for prompt injection. The reporter is `mcp:<caller name>`; the context gets `via: 'mcp'` and `caller`.
+- `allowedOrigins` (default none): a request with an `Origin` header not listed is refused, as MCP
+  requires against DNS rebinding. `rateLimit` is per caller (30 a minute).
+- `sendFeedback({ url, token, from, report })`: report to another app from code, over any server that
+  follows the convention (it does the MCP handshake, sessions and event streams included).
+- Import from `@jbenet/feedback-server/mcp` or the package root.
+
 ## Stores
 
 Every store implements `FeedbackStore` (`create`, `list`, `get`, `update`, `readAttachment`, optional
@@ -376,6 +404,8 @@ The tests cover:
 - idempotency before and after filing;
 - ingest retries, backoff, rate-limit pauses, refusals and identify failures;
 - titles;
+- feedback over MCP: the endpoint end to end, refusals, and interop both ways with the official MCP SDK
+  (its client against the endpoint; `sendFeedback` against an SDK server with `feedbackTools`);
 - prompt injection: the patterns against attacks and honest reports, neutralizing, flag and refuse, the model screen;
 - every store on better-sqlite3, `node:sqlite`, PGlite and optionally real Postgres;
 - the GitHub store against a mocked fetch;

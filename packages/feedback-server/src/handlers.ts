@@ -5,6 +5,7 @@
  *   POST  /api/feedback                  journal a report; 202 once it is on disk
  *   GET   /api/feedback?clientId=…       where a journaled report stands (reads the journal only)
  *   GET   /api/feedback/export?since=…   issues created after `since` (Bearer FEEDBACK_EXPORT_TOKEN)
+ *   POST  /api/feedback/mcp              the feedback tools over MCP, for other apps (with `mcp` options; mcp.ts)
  *   GET   /api/issues                    the issues page's list (?status=&kind=&priority=&q=)
  *   GET   /api/issues/:id                one issue
  *   PATCH /api/issues/:id                { status?, priority?, kind?, labels? }
@@ -23,6 +24,7 @@ import { createJournal, type Journal } from './journal.ts';
 import { checkOrigin, type OriginPolicy } from './origin.ts';
 import { STATUSES, KINDS, PRIORITIES, type FeedbackStore, type IssueFilter, type IssuePatch, type IssueStatus, type IssueKind, type IssuePriority } from './types.ts';
 import { patternScreen } from './injection.ts';
+import { createFeedbackMcp, type FeedbackMcpOptions } from './mcp.ts';
 import { checkReport, DEFAULT_LIMITS, isClientId, newClientId, type Limits } from './validate.ts';
 
 export type Action = 'read' | 'update' | 'attachment';
@@ -72,6 +74,11 @@ export interface HandlerOptions {
   onSuspicious?: 'flag' | 'refuse';
   /** Called after a new report is journaled. Default: kick the ingester started for this journal. */
   onJournaled?: (clientId: string) => void;
+  /**
+   * Serve the feedback tools over MCP at `${basePath}/mcp`, so other apps and their agents can give
+   * this one feedback (docs/MCP.md). `identify` says who is calling; without `mcp` there is no endpoint.
+   */
+  mcp?: Omit<FeedbackMcpOptions, 'journal' | 'store'>;
 }
 
 export interface FeedbackHandler {
@@ -126,6 +133,9 @@ export function createFeedbackHandler(options: HandlerOptions): FeedbackHandler 
   const accepting = () => (typeof options.accept === 'function' ? options.accept() : options.accept ?? true);
   const exportToken = () => (typeof options.exportToken === 'function' ? options.exportToken() : options.exportToken ?? process.env.FEEDBACK_EXPORT_TOKEN);
   const journaled = options.onJournaled ?? (() => ingesterFor(journal.dir)?.kick());
+  const mcp = options.mcp ? createFeedbackMcp({
+    limits: options.limits, onSuspicious: options.onSuspicious, onJournaled: options.onJournaled, ...options.mcp, journal, store,
+  }) : null;
 
   async function allowed(req: Request, action: Action): Promise<Response | null> {
     if (!options.authorize) return null;
@@ -316,6 +326,7 @@ export function createFeedbackHandler(options: HandlerOptions): FeedbackHandler 
         }
         const [head, ...rest] = parts;
         if (head === 'export' && rest.length === 0 && req.method === 'GET') return await exportIssues(req, url);
+        if (head === 'mcp' && rest.length === 0 && mcp) return await mcp.handle(req);
         if (head === 'issues') return await issues(req, url, rest);
         if (head === 'attachments' && rest.length > 0 && req.method === 'GET') return await attachment(req, rest);
         return json({ error: 'Not found.' }, 404);

@@ -13,4 +13,4 @@ export const runtime = 'nodejs';       // the journal needs node:fs
 export const dynamic = 'force-dynamic';
 
 // The handler is made on the first request, not when Next imports this file while building.
-export const { GET, POST, PATCH } = nextRoutes({ handle: (req) => feedback().handler.handle(req) });
+export const { GET, POST, PATCH, DELETE } = nextRoutes({ handle: (req) => feedback().handler.handle(req) });

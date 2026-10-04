@@ -46,6 +46,15 @@ FEEDBACK_GITHUB_REPO=owner/name FEEDBACK_GITHUB_TOKEN=github_pat_… FEEDBACK_GI
 issue also gets `kind:*`, `priority:*` and `status:*`. Status changes on the issues page relabel or
 close the GitHub issue, and changes made on GitHub come back within a minute.
 
+**Feedback from other apps (MCP).** The example serves the feedback tools at `/api/feedback/mcp` and
+says so at `/.well-known/feedback.json` ([docs/MCP.md](../../docs/MCP.md)). Give each app that may
+report a token in `FEEDBACK_MCP_CALLERS`, as JSON `{"<token>": "<name>"}`; a name ending in `+read`
+may also list and read the issues. Then point an MCP client at it with that token, or from code:
+
+```sh
+FEEDBACK_MCP_CALLERS='{"s3cr3t-billing":"billing-app"}' npm run dev
+```
+
 **Sign in as.** The rail has a demo "Sign in as" (Robin Vega or Sam Okafor, both invented). It sets a
 `demo_user` cookie that the server reads to name the reporter (`resolveReporter`) and to open the issue
 reads, pictures and status changes (`authorize`). Signed out, the issues pages and their API answer 401,

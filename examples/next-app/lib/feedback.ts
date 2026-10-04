@@ -6,6 +6,7 @@
  * (the token is FEEDBACK_GITHUB_TOKEN; see packages/feedback-server/README.md). No model is called for titles here (generateTitle: null),
  * so a title is the first sentence of the report; set one up per packages/feedback-server/README.md.
  */
+import { timingSafeEqual } from 'node:crypto';
 import { join, resolve } from 'node:path';
 import { createFeedbackHandler, fileStore, startIngester, type FeedbackHandler, type FeedbackStore } from '@jbenet/feedback-server';
 import { githubStore, type GitHubAttachments } from '@jbenet/feedback-server/github';
@@ -38,6 +39,14 @@ export function feedback(): Wired {
     authorize: (req) => userFromCookieHeader(req.headers.get('cookie'))
       ? true
       : Response.json({ error: 'Sign in to see issues' }, { status: 401, headers: { 'cache-control': 'no-store' } }),
+    // Other apps and their agents give this one feedback over MCP at /api/feedback/mcp (docs/MCP.md).
+    // FEEDBACK_MCP_CALLERS is JSON, {"<token>": "<caller name>"}: one token per app allowed to report.
+    // A name ending in "+read" may also list and read the issues. Unset: every call answers 401.
+    mcp: {
+      app: { name: 'orchard-street-example', version: '0.1.0' },
+      about: 'An invented bakery app: orders, weekly reports and settings.',
+      identify: (req) => mcpCaller(req.headers.get('authorization')),
+    },
   });
   g.__feedbackExample = { store, handler };
   return g.__feedbackExample;
@@ -83,3 +92,14 @@ function githubPictures(repo: string): GitHubAttachments {
 
 /** Where readers of a GitHub issue reach this app, for the picture links. */
 const appUrl = () => (process.env.FEEDBACK_APP_URL ?? `http://localhost:${process.env.PORT ?? 3172}`).replace(/\/$/, '');
+
+/** The caller an MCP request's bearer token names, from FEEDBACK_MCP_CALLERS; null for anyone else. */
+function mcpCaller(authorization: string | null): { name: string; canRead: boolean } | null {
+  let callers: Record<string, string> = {};
+  try { callers = JSON.parse(process.env.FEEDBACK_MCP_CALLERS ?? '{}') as Record<string, string>; } catch { /* malformed: nobody */ }
+  const token = (authorization ?? '').replace(/^Bearer\s+/i, '');
+  const entry = token ? Object.entries(callers).find(([t]) => t.length === token.length && timingSafeEqual(Buffer.from(t), Buffer.from(token))) : undefined;
+  if (!entry) return null;
+  const name = entry[1].replace(/\+read$/, '');
+  return { name, canRead: entry[1].endsWith('+read') };
+}

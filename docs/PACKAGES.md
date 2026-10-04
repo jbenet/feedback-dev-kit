@@ -42,6 +42,7 @@ optional.
 | `better-sqlite3` | ≥ 11 (13.0.3 in development) | optional peer | The SQLite store. |
 | `pg` | ≥ 8 (8.23.0 in development) | optional peer | The Postgres store. |
 | `@anthropic-ai/sdk` | ≥ 0.60 (0.129.0 in development) | optional peer | The AI title adapter. Any model can be used through the title hook instead. |
+| `@modelcontextprotocol/sdk` | 1.32.0 | dev only | Interop tests for feedback over MCP. The kit's endpoint and `sendFeedback` speak MCP's Streamable HTTP themselves, with no runtime dependency. |
 | GitHub REST API | `2022-11-28` | via `fetch` | The GitHub store uses plain `fetch`, no Octokit, to keep rate-limit handling explicit. |
 
 Not dependencies: no YAML library (the frontmatter is a closed set of scalars and string lists, written
