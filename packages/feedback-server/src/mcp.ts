@@ -116,6 +116,7 @@ export function feedbackTools(options: Omit<FeedbackMcpOptions, 'identify' | 'al
     title: 'Give this app feedback',
     description: `File a bug report, feature request, question or chore with this app's maintainers.${about} `
       + 'Use it when something in this app (its API, its tools, its data, its docs) is wrong, missing, slow or confusing for you. '
+      + 'One problem, or one set of related things, per report: several small details about the same tool, page or workflow go together as a list; unrelated problems go in separate reports. '
       + 'Write what you expected and what happened, with enough to reproduce it: the tool or endpoint, the input, the error. '
       + 'Never include secrets, credentials or personal data. Pass a client_id you keep (a UUID) so a retry is not filed twice; '
       + 'then ask feedback_status for the issue it became.',
