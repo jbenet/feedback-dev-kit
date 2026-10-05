@@ -117,6 +117,7 @@ Every prop is optional; without a provider the defaults apply.
 | `theme` | `{}` | CSS variable overrides, applied inline on every root the kit draws, on top of the default PLC green theme. `GREEN_THEME` is an example (see [Theming](#theming)). |
 | `destinationNote` | "Filed with the issue on the server." | Where screenshots go; shown at the end of the screenshot (?) tooltip. |
 | `pathname`, `search` | `window.location` | The page, from your router, so client-side navigation is seen. |
+| `trustedImageOrigins` | `[]` | Origins (e.g. `https://cdn.example.com`) whose images an issue may show besides its own attachments. Issues are written by reporters, so no other remote image is loaded. |
 
 `openFeedback()` opens the box from any control of your own.
 
@@ -135,7 +136,17 @@ Every prop is optional; without a provider the defaults apply.
 | `enqueue`, `startOutbox`, `retryNow`, `discardEntry`, `useOutbox` | The outbox, headless. |
 | `classify`, `settle`, `due`, `retryDelay` | The outbox's pure rules, for tests. |
 
-Anything in your app marked with the class `nocapture` is left out of the automatic screenshot.
+Anything in your app marked with the class `nocapture` is left out of the automatic screenshot. Mark
+an element `data-private` to keep its place in the picture but blur its content. Password, card
+(`autocomplete="cc-…"`), one-time-code and new-password fields are masked on their own.
+
+**Security.** Issue text, titles, labels and attachment lists come from reporters (people, or other apps
+over MCP), so the issues pages treat them as untrusted: links are only `http(s):`, `mailto:`, same-site
+paths and anchors (anything else is shown as text); pictures load only from the store's own
+`attachments/…` or `trustedImageOrigins`; a kind is a CSS class only if it is one of the four. The
+address filed with a report has no fragment and no secret-looking query values. One known limit: the
+offline outbox and drafts belong to the browser, not the signed-in user, so on a shared computer clear
+them at sign-out (`discardEntry`, `discardDraft`) if a report could replay under the next person.
 
 ## Theming
 

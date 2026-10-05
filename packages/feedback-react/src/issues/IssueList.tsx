@@ -4,7 +4,7 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState, type ComponentT
 import { themeStyle, useFeedbackConfig } from '../config';
 import { isTypingTarget } from '../keyboard';
 import { ago } from '../time';
-import { KINDS, PRIORITIES, STATUSES, type Issue } from './types';
+import { KIND_CLASS, KINDS, PRIORITIES, STATUSES, type Issue } from './types';
 
 /** A link component, so a router's own (Next's Link) can replace a plain <a>. */
 export type LinkLike = ComponentType<{ href: string; className?: string; children?: ReactNode }>;
@@ -147,7 +147,7 @@ export function IssueList({
                     <Link href={href(i.id)}><b>{i.title}</b></Link>
                     <div className="muted" style={{ fontSize: 11.5 }}>{i.reporter} · {i.page}</div>
                   </td>
-                  <td><span className={`kind k-${i.kind}`}>{i.kind}</span></td>
+                  <td><span className={`kind k-${KIND_CLASS(i.kind)}`}>{i.kind}</span></td>
                   <td className="mono">{i.priority}</td>
                   <td><span className={`flag ${i.status === 'done' ? 'f-ok' : 'f-mute'}`}>{i.status}</span></td>
                   <td className="mono">{i.fixedIn ?? <span className="muted">—</span>}</td>

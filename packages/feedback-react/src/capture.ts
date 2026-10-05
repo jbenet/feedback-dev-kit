@@ -15,7 +15,10 @@
  * worth more than the last few per cent of fidelity. The screen path stays available for
  * somebody who explicitly wants exact pixels and will accept the prompt.
  *
- * Nothing is captured when the box opens. A screenshot is taken when somebody asks for one.
+ * One automatic render is taken when the box opens (the reporter can delete it before filing).
+ * Values a page holds as secrets are masked in it: password, card, one-time-code and new-password
+ * fields, and anything marked `data-private` (blurred). Mark a whole region `nocapture` to leave it
+ * out, or `data-private` to keep its layout but not its content.
  */
 
 export type CaptureMethod = 'screen' | 'render';
@@ -209,6 +212,12 @@ async function renderNow(region?: Region): Promise<string | null> {
         // Not `instanceof`: the clone may belong to another window's constructors.
         if (node.nodeType !== Node.ELEMENT_NODE) return;
         const el = node as HTMLElement;
+        // Secrets the page shows in fields: the value was already copied into the clone; mask it.
+        if (el.tagName === 'INPUT' && isSecretField(el as HTMLInputElement)) {
+          const v = el.getAttribute('value') ?? '';
+          el.setAttribute('value', v ? '•'.repeat(Math.min(12, v.length)) : '');
+        }
+        if (el.hasAttribute('data-private')) el.style.setProperty('filter', 'blur(7px)');
         // No scrollbars: the clone drew ones the page didn't show — one across the foot of the
         // rail — and its scrolled panels are already drawn at their scroll.
         for (const prop of ['overflow', 'overflow-x', 'overflow-y']) {
@@ -326,3 +335,11 @@ export const METHOD_LABEL: Record<CaptureMethod, string> = {
   screen: 'Captured from your screen',
   render: 'Automatic capture may not be exact.',
 };
+
+/** Fields whose value is a secret by the page's own markup. */
+function isSecretField(el: HTMLInputElement): boolean {
+  const type = (el.getAttribute('type') ?? '').toLowerCase();
+  const auto = (el.getAttribute('autocomplete') ?? '').toLowerCase();
+  return type === 'password' || el.hasAttribute('data-private')
+    || /(^|\s)(cc-|one-time-code|new-password|current-password)/.test(auto);
+}

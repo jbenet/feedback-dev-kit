@@ -32,6 +32,8 @@ export interface Issue {
 export const STATUSES: IssueStatus[] = ['open', 'triaged', 'agent-ready', 'in-progress', 'done'];
 export const PRIORITIES: IssuePriority[] = ['P0', 'P1', 'P2', 'P3'];
 export const KINDS: IssueKind[] = ['bug', 'request', 'question', 'chore'];
+/** A kind as a CSS class suffix: one of ours, or 'other' (the kind is reporter data, not a class list). */
+export const KIND_CLASS = (kind: string): string => ((KINDS as string[]).includes(kind) ? kind : 'other');
 
 /** What each priority means: an order, not a delivery date — the queue decides the date. */
 export const PRIORITY: Record<IssuePriority, { means: string; detail: string }> = {

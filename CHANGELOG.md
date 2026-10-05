@@ -4,6 +4,17 @@ Both packages share one version.
 
 ## Unreleased
 
+- **Security pass** (5 Oct 2026):
+  - A report could forge its own captured context (reporter, verification, page) by writing a
+    `json context` block in its text. The reader now takes the last block, and the writer never lets
+    the body carry one.
+  - The MCP endpoint read a whole request body before checking its size; it now stops at the limit.
+  - Issue pages: markdown links are only `http(s):`, `mailto:`, same-site and anchors (no
+    `javascript:` or `//elsewhere`); pictures load only from the issue's own attachments or
+    `trustedImageOrigins` (no remote tracking pixels, no `attachments/../..` paths); kinds are CSS
+    classes only from the allowed four.
+  - The automatic screenshot masks password, card, one-time-code and new-password fields, and blurs
+    `data-private` elements. The filed address has no fragment and no secret-looking query values.
 - **Feedback over MCP** ([docs/MCP.md](docs/MCP.md)): a convention for apps and their agents to give
   each other feedback. Four tools (`feedback_submit`, `feedback_status`, `feedback_list`,
   `feedback_get`); `createFeedbackHandler({ mcp: { identify } })` serves them at

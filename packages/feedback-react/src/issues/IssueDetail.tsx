@@ -1,9 +1,9 @@
 'use client';
 
-import { themeStyle, useFeedbackConfig } from '../config';
+import { safeAttachmentUrl, themeStyle, useFeedbackConfig } from '../config';
 import { Markdown } from '../Markdown';
 import { shortDate } from '../time';
-import { PRIORITY, STATUSES, type Issue, type IssuePriority } from './types';
+import { KIND_CLASS, PRIORITY, STATUSES, type Issue, type IssuePriority } from './types';
 import type { LinkLike } from './IssueList';
 
 const PlainLink: LinkLike = ({ href, className, children }) => <a href={href} className={className}>{children}</a>;
@@ -24,7 +24,7 @@ export function IssueDetail({
   onStatusChange?: (status: string) => void;
 }) {
   const config = useFeedbackConfig();
-  const url = config.endpoints.attachment;
+  const url = (path: string) => safeAttachmentUrl(config, path);
   const p = PRIORITY[issue.priority as IssuePriority];
   return (
     <div className="fbk" style={themeStyle(config.theme)}><div className="issuedetail">
@@ -33,7 +33,7 @@ export function IssueDetail({
         <h1 style={{ marginTop: 8 }}>{issue.title}</h1>
         <p className="sublede">
           <span className="mono muted">{issue.id}</span>{' '}
-          <span className={`kind k-${issue.kind}`}>{issue.kind}</span>{' '}
+          <span className={`kind k-${KIND_CLASS(issue.kind)}`}>{issue.kind}</span>{' '}
           <span className="flag f-mute">{issue.priority}</span>{' '}
           <span className={`flag ${issue.status === 'done' ? 'f-ok' : 'f-mute'}`} data-status={issue.status}>{issue.status}</span>
         </p>
@@ -43,7 +43,7 @@ export function IssueDetail({
           <div className="cbody">
             <Markdown
               source={issue.body}
-              resolveImage={(href) => (href.startsWith('/') ? href : url(href))}
+              resolveImage={url}
             />
           </div>
         </div>
@@ -55,12 +55,15 @@ export function IssueDetail({
               <span className="lbl">{issue.screenshots.length} screenshot{issue.screenshots.length === 1 ? '' : 's'}</span>
             </div>
             <div className="cbody">
-              {issue.screenshots.map((shot, i) => (
-                <a key={shot} href={url(shot)} target="_blank" rel="noreferrer">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img className="issueshot" src={url(shot)} alt={`Screenshot ${i + 1} filed with issue ${issue.id}`} loading="lazy" />
-                </a>
-              ))}
+              {issue.screenshots.map((shot, i) => {
+                const src = url(shot);
+                return src ? (
+                  <a key={shot} href={src} target="_blank" rel="noreferrer noopener">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img className="issueshot" src={src} alt={`Screenshot ${i + 1} filed with issue ${issue.id}`} loading="lazy" />
+                  </a>
+                ) : <p key={shot} className="mdmissing">Screenshot {i + 1} is not an attachment of this issue: {shot}</p>;
+              })}
             </div>
             <p className="cover">
               <b>Captured in the reporter&rsquo;s browser when they opened the box</b>, before the box
