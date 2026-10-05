@@ -1,3 +1,4 @@
+import { safeLinkHref } from './config';
 import { parseInline, parseMarkdown, type Block, type Inline } from './markdown-parse';
 
 /**
@@ -36,9 +37,12 @@ export function Spans({
           return <img key={i} className="mdimg" src={href} alt={s.text} loading="lazy" />;
         }
         if (s.kind === 'link') {
-          const href = s.href ?? '';
-          return href.startsWith('http') ? (
-            <a key={i} href={href} target="_blank" rel="noreferrer">{s.text}</a>
+          // Issue text is written by reporters: only web, mail, same-site and anchor links are links.
+          // `javascript:`, `data:` and protocol-relative `//elsewhere` are shown as their text.
+          const href = safeLinkHref(s.href ?? '');
+          if (!href) return <span key={i}>{s.text}</span>;
+          return /^https?:/i.test(href) ? (
+            <a key={i} href={href} target="_blank" rel="noreferrer noopener">{s.text}</a>
           ) : (
             <a key={i} href={href}>{s.text}</a>
           );

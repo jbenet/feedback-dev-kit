@@ -110,13 +110,22 @@ export function parseIssue(file: string, fallbackId: string): ParsedIssue {
   };
 }
 
+/**
+ * The captured context is the last `json context` block: the writer always puts it after the body.
+ * Taking the first one let a report forge its own context (reporter, verification, page) by writing a
+ * block of that name into its text, ahead of the real one.
+ */
 function splitContext(rest: string): { body: string; context: Record<string, unknown> | null } {
-  const fence = /```json context\r?\n([\s\S]*?)```/.exec(rest);
+  const fences = [...rest.matchAll(/```json context\r?\n([\s\S]*?)```/g)];
+  const fence = fences.at(-1);
   if (!fence) return { body: rest.trim(), context: null };
   let context: Record<string, unknown> | null = null;
   try { context = JSON.parse(fence[1]!) as Record<string, unknown>; } catch { context = null; }
-  return { body: rest.replace(fence[0], '').trim(), context };
+  return { body: (rest.slice(0, fence.index) + rest.slice(fence.index! + fence[0].length)).trim(), context };
 }
+
+/** A body never carries a block the reader would take for the context: its fence keeps the language only. */
+const bodyText = (body: string) => body.replace(/^(\s*)```json context\b/gm, '$1```json');
 
 /** The writer quotes with JSON.stringify, so the reader unescapes with JSON.parse. */
 function unquote(s: string): string {
@@ -154,7 +163,7 @@ export function serializeIssue(issue: ParsedIssue): string {
     ...(issue.extra ?? []),
     '---',
     '',
-    issue.body.trim(),
+    bodyText(issue.body.trim()),
     '',
   ];
   for (const shot of issue.screenshots) {

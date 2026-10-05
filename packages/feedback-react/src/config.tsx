@@ -1,5 +1,6 @@
 'use client';
 
+import { cleanUrl, SECRET_KEY } from './safe-urls';
 import { createContext, useContext, useMemo, type CSSProperties, type ReactNode } from 'react';
 
 /** The keys that open the feedback box. `code` is the physical key (KeyboardEvent.code). */
@@ -46,6 +47,13 @@ export interface FeedbackConfig {
   /** One sentence under the screenshots saying where they go. */
   destinationNote?: string;
   /**
+   * Origins whose images an issue may show besides this app's own attachments, e.g.
+   * `https://feedback-cdn.example.com` for a store that keeps pictures there. Issues are written by
+   * reporters, so any other absolute image URL is not loaded (it would tell its owner who read the
+   * issue, and when). Default: none.
+   */
+  trustedImageOrigins?: string[];
+  /**
    * The page the reporter is on. Pass your router's pathname and search so a client-side
    * navigation with the box open is seen; without it the kit reads `window.location` each render.
    */
@@ -61,6 +69,7 @@ export interface ResolvedFeedbackConfig {
   issueHref: (id: string) => string;
   theme: Record<string, string>;
   destinationNote: string;
+  trustedImageOrigins: string[];
   pathname: string | null;
   search: string | null;
 }
@@ -87,6 +96,7 @@ export function resolveConfig(c: FeedbackConfig = {}): ResolvedFeedbackConfig {
     issueHref: c.issueHref ?? ((id) => `/issues/${encodeURIComponent(id)}`),
     theme: c.theme ?? {},
     destinationNote: c.destinationNote ?? 'Filed with the issue on the server.',
+    trustedImageOrigins: c.trustedImageOrigins ?? [],
     pathname: c.pathname ?? null,
     search: c.search ?? null,
   };
@@ -125,8 +135,8 @@ export function currentLocation(c: ResolvedFeedbackConfig): { path: string; filt
   const search = c.search ?? (hasWindow ? window.location.search : '');
   return {
     path,
-    filters: Object.fromEntries(new URLSearchParams(search).entries()),
-    url: hasWindow ? window.location.href : undefined,
+    filters: Object.fromEntries([...new URLSearchParams(search).entries()].map(([k, v]) => [k, SECRET_KEY.test(k) ? '[removed]' : v])),
+    url: hasWindow ? cleanUrl(window.location.href) : undefined,
   };
 }
 
@@ -149,3 +159,5 @@ export const GREEN_THEME: Record<string, string> = {
   '--fbk-accent': '#1E8F5E', '--fbk-accent-soft': '#EFF8F3', '--fbk-accent-line': '#BFE0CE',
   '--fbk-accent-wash': '#F4F9F5', '--fbk-accent-halo': '#D8EEE2',
 };
+
+export { safeAttachmentUrl, safeLinkHref } from './safe-urls';

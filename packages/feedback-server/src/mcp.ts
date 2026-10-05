@@ -23,6 +23,7 @@
  * another system: it goes through the same journal, limits, secret scrubbing and injection screen as
  * any other report, and docs/TRIAGE.md §10 applies to whoever reads it.
  */
+import { readLimited } from './http.ts';
 import { ingesterFor } from './ingest.ts';
 import { createJournal, type Journal } from './journal.ts';
 import { KINDS, PRIORITIES, STATUSES, type FeedbackStore, type Issue, type IssueFilter } from './types.ts';
@@ -296,8 +297,9 @@ export function createFeedbackMcp(options: FeedbackMcpOptions): { handle(req: Re
     }
     let msg: RpcMessage;
     try {
-      const text = await req.text();
-      if (text.length > (options.limits?.maxRequestBytes ?? DEFAULT_LIMITS.maxRequestBytes)) return rpc(null, { error: { code: -32600, message: 'Request too large.' } }, 413);
+      // Read no further than the limit: a caller cannot make the server hold an unbounded body.
+      const text = await readLimited(req, options.limits?.maxRequestBytes ?? DEFAULT_LIMITS.maxRequestBytes);
+      if (text === null) return rpc(null, { error: { code: -32600, message: 'Request too large.' } }, 413);
       msg = JSON.parse(text) as RpcMessage;
     } catch {
       return rpc(null, { error: { code: -32700, message: 'Parse error.' } }, 400);
