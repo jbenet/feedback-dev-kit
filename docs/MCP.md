@@ -221,7 +221,10 @@ the convention, not only the kit's. Keep the `client_id` you send, and reuse it 
 
 Put these in the calling agent's instructions (they are also in the tool descriptions):
 
-- File what is wrong or missing **in the receiving app**, not in your own. One problem per report.
+- File what is wrong or missing **in the receiving app**, not in your own.
+- **One problem, or one set of related things, per report.** Several small details about the same
+  tool, page or workflow go together in one report, as a list. Unrelated problems get separate
+  reports. Many tiny issues are harder to triage than one that covers a workflow.
 - Say what you expected, what happened, and how to reproduce it: the tool or endpoint, the input, the
   error, a request id.
 - **Never send secrets, credentials or personal data**, in the body, the context or a screenshot.
