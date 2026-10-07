@@ -6,6 +6,8 @@
  *   GET   /api/feedback?clientId=…       where a journaled report stands (reads the journal only)
  *   GET   /api/feedback/export?since=…   issues created after `since` (Bearer FEEDBACK_EXPORT_TOKEN)
  *   POST  /api/feedback/mcp              the feedback tools over MCP, for other apps (with `mcp` options; mcp.ts)
+ *   GET   /api/feedback/worker?id=…      the one agent working the queue checks in, long-polls (worker.ts)
+ *   DELETE /api/feedback/worker?id=…     it is done
  *   GET   /api/issues                    the issues page's list (?status=&kind=&priority=&q=)
  *   GET   /api/issues/:id                one issue
  *   PATCH /api/issues/:id                { status?, priority?, kind?, labels? }
@@ -26,6 +28,7 @@ import { checkOrigin, type OriginPolicy } from './origin.ts';
 import { STATUSES, KINDS, PRIORITIES, type FeedbackStore, type IssueFilter, type IssuePatch, type IssueStatus, type IssueKind, type IssuePriority } from './types.ts';
 import { patternScreen } from './injection.ts';
 import { createFeedbackMcp, type FeedbackMcpOptions } from './mcp.ts';
+import type { WorkerDispatch } from './worker.ts';
 import { checkReport, DEFAULT_LIMITS, isClientId, newClientId, type Limits } from './validate.ts';
 
 export type Action = 'read' | 'update' | 'attachment';
@@ -80,6 +83,13 @@ export interface HandlerOptions {
    * this one feedback (docs/MCP.md). `identify` says who is calling; without `mcp` there is no endpoint.
    */
   mcp?: Omit<FeedbackMcpOptions, 'journal' | 'store'>;
+  /**
+   * Serve `${basePath}/worker` for the one agent working the queue (worker.ts, docs/TRIAGE.md §8). Its
+   * bearer token (workerToken) also lets it read and update issues, without a session or an Origin.
+   */
+  worker?: WorkerDispatch;
+  /** Bearer token for the worker. Default: FEEDBACK_WORKER_TOKEN. Unset: the worker endpoint answers 404. */
+  workerToken?: string | (() => string | undefined);
 }
 
 export interface FeedbackHandler {
@@ -113,12 +123,22 @@ export function createFeedbackHandler(options: HandlerOptions): FeedbackHandler 
   const store = options.store;
   const accepting = () => (typeof options.accept === 'function' ? options.accept() : options.accept ?? true);
   const exportToken = () => (typeof options.exportToken === 'function' ? options.exportToken() : options.exportToken ?? process.env.FEEDBACK_EXPORT_TOKEN);
+  const workerToken = () => (typeof options.workerToken === 'function' ? options.workerToken() : options.workerToken ?? process.env.FEEDBACK_WORKER_TOKEN);
   const journaled = options.onJournaled ?? (() => ingesterFor(journal.dir)?.kick());
   const mcp = options.mcp ? createFeedbackMcp({
     limits: options.limits, onSuspicious: options.onSuspicious, onJournaled: options.onJournaled, ...options.mcp, journal, store,
   }) : null;
 
+  const bearer = (req: Request, token: string | undefined) => {
+    if (!token) return false;
+    const expected = Buffer.from(`Bearer ${token}`);
+    const supplied = Buffer.from(req.headers.get('authorization') ?? '');
+    return expected.length === supplied.length && timingSafeEqual(expected, supplied);
+  };
+  const isWorker = (req: Request) => !!options.worker && bearer(req, workerToken());
+
   async function allowed(req: Request, action: Action): Promise<Response | null> {
+    if (isWorker(req)) return null;
     if (!options.authorize) return null;
     const verdict = await options.authorize(req, action);
     if (verdict instanceof Response) return verdict;
@@ -204,9 +224,7 @@ export function createFeedbackHandler(options: HandlerOptions): FeedbackHandler 
   async function exportIssues(req: Request, url: URL): Promise<Response> {
     const token = exportToken();
     if (!token || !store) return new Response(null, { status: 404 });
-    const expected = Buffer.from(`Bearer ${token}`);
-    const supplied = Buffer.from(req.headers.get('authorization') ?? '');
-    if (expected.length !== supplied.length || !timingSafeEqual(expected, supplied)) return new Response(null, { status: 401 });
+    if (!bearer(req, token)) return new Response(null, { status: 401 });
     const since = url.searchParams.get('since') ?? '';
     const at = Date.parse(since);
     if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(since) || !Number.isFinite(at)) {
@@ -240,7 +258,7 @@ export function createFeedbackHandler(options: HandlerOptions): FeedbackHandler 
       return issue ? json({ issue }) : json({ error: 'Not found.' }, 404);
     }
     if (req.method === 'PATCH') {
-      if (options.origin !== false) {
+      if (options.origin !== false && !isWorker(req)) {
         const bad = checkOrigin(req, options.origin ?? {});
         if (bad) return json({ error: bad }, 403);
       }
@@ -271,6 +289,33 @@ export function createFeedbackHandler(options: HandlerOptions): FeedbackHandler 
       return json({ issue: await store.update(id, patch) });
     }
     return json({ error: 'Method not allowed.' }, 405, { allow: 'GET, PATCH' });
+  }
+
+  /**
+   * The worker's check-in: ?id= names it (a session id). It holds the lease or gets 409 and exits. With
+   * ?wait=<seconds>&after=<cursor>, the answer waits for a filing after the cursor of its last answer.
+   * The answer carries the open issues, whether to retire, and the next cursor.
+   */
+  async function worker(req: Request, url: URL): Promise<Response> {
+    const dispatch = options.worker;
+    if (!dispatch || !workerToken() || !store) return new Response(null, { status: 404 });
+    if (!bearer(req, workerToken())) return new Response(null, { status: 401 });
+    const id = url.searchParams.get('id') ?? '';
+    if (!/^[\w.:-]{1,128}$/.test(id)) return json({ error: 'Give the worker\'s id, e.g. its session id.' }, 400);
+    if (req.method === 'DELETE') return json({ released: await dispatch.release(id) });
+    if (req.method !== 'GET') return json({ error: 'Method not allowed.' }, 405, { allow: 'GET, DELETE' });
+    let lease = await dispatch.checkIn(id);
+    if (!lease.ok) return json({ error: 'Another worker holds the queue. Exit.', holder: lease.holder, seenAt: lease.seenAt }, 409);
+    const waitS = Number(url.searchParams.get('wait') ?? 0);
+    const after = Number(url.searchParams.get('after') ?? 0);
+    const cursor = dispatch.now();
+    if (Number.isFinite(waitS) && waitS > 0 && Number.isFinite(after) && after > 0) {
+      await dispatch.waitForFiling(after, waitS * 1000);
+      lease = await dispatch.checkIn(id); // the wait counts as being alive
+      if (!lease.ok) return json({ error: 'Another worker holds the queue. Exit.', holder: lease.holder, seenAt: lease.seenAt }, 409);
+    }
+    const issues = (await store.list({ status: ['open'] })).sort((a, b) => a.created.localeCompare(b.created));
+    return json({ retire: lease.retire, startedAt: lease.startedAt, cursor, issues });
   }
 
   async function attachment(req: Request, rest: string[]): Promise<Response> {
@@ -308,6 +353,7 @@ export function createFeedbackHandler(options: HandlerOptions): FeedbackHandler 
         const [head, ...rest] = parts;
         if (head === 'export' && rest.length === 0 && req.method === 'GET') return await exportIssues(req, url);
         if (head === 'mcp' && rest.length === 0 && mcp) return await mcp.handle(req);
+        if (head === 'worker' && rest.length === 0) return await worker(req, url);
         if (head === 'issues') return await issues(req, url, rest);
         if (head === 'attachments' && rest.length > 0 && req.method === 'GET') return await attachment(req, rest);
         return json({ error: 'Not found.' }, 404);

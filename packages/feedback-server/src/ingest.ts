@@ -62,7 +62,7 @@ export interface IngesterOptions {
   /** GUESS: a screen is worth a few seconds, like a title. A screen that fails or times out flags the report. */
   screenTimeoutMs?: number;
   /** After an issue is filed (notify a channel, kick an agent). Errors are logged and ignored. */
-  onFiled?: (issue: Issue, entry: JournalEntry) => void | Promise<void>;
+  onFiled?: (issue: Issue, entry: JournalEntry) => unknown;
   logger?: Pick<Console, 'warn' | 'info'>;
   /** Monotonic milliseconds for backoff; a wall-clock step never stalls or floods retries. */
   clock?: () => number;
