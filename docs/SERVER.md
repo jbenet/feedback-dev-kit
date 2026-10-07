@@ -140,6 +140,22 @@ who can reach the server**, so a real app must supply one from its session, as i
 
 ### 2.4 `GET /api/feedback/export?since=…` — see [§9](#9-the-export-endpoint).
 
+### 2.5 The worker endpoint
+
+For the one agent working the queue ([TRIAGE.md §8](TRIAGE.md#one-worker-at-a-time-woken-by-a-filing)),
+served when `createFeedbackHandler({ worker })` is given a `createWorkerDispatch()` and
+`FEEDBACK_WORKER_TOKEN` (or `workerToken`) is set; otherwise 404. `Authorization: Bearer <token>`,
+compared in constant time; anything else is 401.
+
+- `GET {base}/worker?id=<worker id>` checks in and answers `{ retire, startedAt, cursor, issues }`:
+  every `open` issue, oldest first. 409 `{ holder, seenAt }` when another live worker holds the queue.
+- `&wait=<seconds>&after=<cursor>` waits (at most 9 minutes) for a filing after the cursor of the last
+  answer, then answers the same way.
+- `DELETE {base}/worker?id=…` releases the lease: `{ released: 'released' | 'handed-on' | 'not-holder' }`.
+  `handed-on` means issues were filed after its last check-in, and a successor was woken.
+- The same token reads and updates issues (`GET`/`PATCH /api/issues…`) without a session or an
+  Origin header, so the worker can mark what it takes.
+
 ## 3. Journal first, file later
 
 PL LabOS tools learned this on 27 Sep 2026. The live server is one Node process. During a large import

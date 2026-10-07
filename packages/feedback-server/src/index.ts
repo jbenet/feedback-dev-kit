@@ -23,3 +23,7 @@ export {
   feedbackTools, createFeedbackMcp, sendFeedback, FEEDBACK_MCP_VERSION, MCP_PROTOCOL_VERSIONS,
   type FeedbackMcpOptions, type FeedbackTool, type McpCaller, type ToolResult, type SendFeedbackOptions,
 } from './mcp.ts';
+export {
+  createWorkerDispatch, routineWake,
+  type WorkerDispatch, type WorkerOptions, type WorkerState, type CheckIn, type RoutineWakeOptions,
+} from './worker.ts';

@@ -4,6 +4,11 @@ Both packages share one version.
 
 ## Unreleased
 
+- **One feedback worker at a time** (7 Oct 2026): `createWorkerDispatch()` wakes an agent when feedback
+  is filed and none is working (`routineWake()` fires a Claude Code routine), and queues new issues
+  for the running one, which long-polls `GET /api/feedback/worker`. It retires when idle or after a
+  few hours, and the next filing wakes a fresh one: no polling, no two agents on the same code, no
+  endless context. Recipe and routine prompt in [docs/TRIAGE.md §8](docs/TRIAGE.md#one-worker-at-a-time-woken-by-a-filing).
 - **Security pass** (5 Oct 2026):
   - A report could forge its own captured context (reporter, verification, page) by writing a
     `json context` block in its text. The reader now takes the last block, and the writer never lets

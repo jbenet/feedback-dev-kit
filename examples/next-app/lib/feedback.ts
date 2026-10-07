@@ -8,7 +8,7 @@
  */
 import { timingSafeEqual } from 'node:crypto';
 import { join, resolve } from 'node:path';
-import { createFeedbackHandler, fileStore, startIngester, type FeedbackHandler, type FeedbackStore } from '@jbenet/feedback-server';
+import { createFeedbackHandler, createWorkerDispatch, fileStore, routineWake, startIngester, type FeedbackHandler, type FeedbackStore } from '@jbenet/feedback-server';
 import { githubStore, type GitHubAttachments } from '@jbenet/feedback-server/github';
 import { userFromCookieHeader } from './users';
 
@@ -26,10 +26,17 @@ const g = globalThis as typeof globalThis & { __feedbackExample?: Wired };
 export function feedback(): Wired {
   if (g.__feedbackExample) return g.__feedbackExample;
   const store = makeStore();
-  startIngester({ journal: journalDir, store, generateTitle: null, everyMs: 5_000 });
+  // One agent works the queue at a time (docs/TRIAGE.md §8): with FEEDBACK_ROUTINE_URL and
+  // FEEDBACK_ROUTINE_TOKEN, a filing fires that Claude Code routine unless a worker is already running;
+  // the worker checks in at /api/feedback/worker with FEEDBACK_WORKER_TOKEN.
+  const routine = process.env.FEEDBACK_ROUTINE_URL && process.env.FEEDBACK_ROUTINE_TOKEN
+    ? { url: process.env.FEEDBACK_ROUTINE_URL, token: process.env.FEEDBACK_ROUTINE_TOKEN } : null;
+  const worker = routine ? createWorkerDispatch({ file: join(root, 'worker.json'), wake: routineWake(routine) }) : undefined;
+  startIngester({ journal: journalDir, store, generateTitle: null, everyMs: 5_000, onFiled: worker?.onFiled });
   const handler = createFeedbackHandler({
     journal: journalDir,
     store,
+    worker,
     // Who is filing comes from the session (here, the demo's sign-in cookie), never from the body.
     // Signed out, a report still files, as "unknown": a complaint is never lost to a login.
     resolveReporter: (req) => userFromCookieHeader(req.headers.get('cookie'))?.handle ?? null,
