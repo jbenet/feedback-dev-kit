@@ -150,7 +150,11 @@ unsupported, or it took too long. Everything else still files."
 
 **Annotate** opens a full-screen editor over the picture:
 
-- Tools: select, freehand pen (the default), arrow, line, box, and text label.
+- Tools: select, freehand pen (the default), arrow, line, box, text label, and crop.
+- **Crop**: drag the part of the picture to keep; what it leaves out is dimmed. Drag inside the crop
+  to move it, drag elsewhere for a new one, click outside it to keep the whole picture again. Undo
+  and Redo take it back and forth like a mark. Nothing is cut until **Done**, so marks outside the
+  crop can still be dragged in; the saved picture is the crop's size.
 - **Select** (the pointer) is also the way out of another tool. Click a mark to select it (a dashed
   outline, never saved); drag to move it; **Delete** or **Backspace** removes it; a color or stroke
   width picked while it is selected applies to it. Esc deselects.

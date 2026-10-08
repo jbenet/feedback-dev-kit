@@ -4,6 +4,9 @@ Both packages share one version.
 
 ## Unreleased
 
+- **Crop** in the annotator (8 Oct 2026): drag the part of the screenshot to keep, move it, or click
+  outside it to keep the whole picture. It is undoable like a mark, and the saved picture is the
+  crop's size.
 - **One feedback worker at a time** (7 Oct 2026): `createWorkerDispatch()` wakes an agent when feedback
   is filed and none is working (`routineWake()` fires a Claude Code routine), and queues new issues
   for the running one, which long-polls `GET /api/feedback/worker`. It retires when idle or after a

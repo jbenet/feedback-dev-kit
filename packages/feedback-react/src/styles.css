@@ -226,7 +226,7 @@
 /* Exactly the picture's box: a label's position is a share of the picture and nothing else. */
 .fbk .setimg{position:relative;align-self:center;max-width:100%}
 .fbk .setcanvas{display:block;max-width:100%;max-height:74vh;margin:0 auto;border-radius:8px; box-shadow:0 12px 44px rgba(0,0,0,.5);background:#fff;touch-action:none}
-.fbk .setcanvas.t-pen,.fbk .setcanvas.t-arrow,.fbk .setcanvas.t-line,.fbk .setcanvas.t-box{cursor:crosshair}
+.fbk .setcanvas.t-pen,.fbk .setcanvas.t-arrow,.fbk .setcanvas.t-line,.fbk .setcanvas.t-box,.fbk .setcanvas.t-crop{cursor:crosshair}
 .fbk .setcanvas.t-text{cursor:text}
 .fbk .setcanvas.t-select{cursor:default}
 /* A placed label is a real object: drag it, resize it, type in it again (issue 0014). The
