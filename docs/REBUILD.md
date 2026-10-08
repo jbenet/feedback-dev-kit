@@ -446,7 +446,9 @@ Full-screen over everything (`nocapture`), editing one image (a screenshot or a 
 - Base image drawn on a canvas at its natural size; the canvas is scaled to fit on screen.
 - Marks: `pen` (points), `arrow` and `line` (from, to), `box` (from, to), `text` (id, colour, size in
   image pixels, position, wrap width, a `sized` flag once the corner is dragged, a min height, text with
-  newlines, bold). Default tool: pen. Default colour: the accent (clay `#BF4A16`). Palette: `#BF4A16`,
+  newlines, bold), `crop` (a rect in image pixels, or null for the whole picture; the last crop mark
+  counts, so undo takes it back; dimmed outside on screen; at export the canvas is the crop's size and
+  everything is painted shifted by its corner). Default tool: pen. Default colour: the accent (clay `#BF4A16`). Palette: `#BF4A16`,
   `#0E7F55`, `#5F4B9E`, `#1A1917`, `#FFFFFF`, a custom `<input type="color">` (it takes `#rrggbb` only;
   normalise `rgb()` and `#rgb`), and `EyeDropper` where it exists (do not draw the button elsewhere; while
   it is open, ignore Esc).

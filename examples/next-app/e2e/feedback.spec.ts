@@ -400,6 +400,55 @@ test('the annotator: select a mark to move or delete it; stroke widths sit with 
   await expect(bar).toBeHidden();
 });
 
+test('the annotator crops: drag the part to keep, undo it, and the saved picture is that part', async ({ page }) => {
+  await page.goto('/');
+  const box = await openWithShortcut(page);
+  const thumb = box.getByRole('img', { name: 'Screenshot 1' });
+  const size = () => thumb.evaluate((img: HTMLImageElement) => new Promise<[number, number]>((r) => {
+    const done = () => r([img.naturalWidth, img.naturalHeight]);
+    if (img.complete && img.naturalWidth) done(); else img.addEventListener('load', done, { once: true });
+  }));
+  const [w0, h0] = await size();
+  await box.getByRole('button', { name: 'Annotate screenshot 1' }).click();
+  const bar = page.getByRole('toolbar', { name: 'Annotation tools' });
+  const canvas = page.locator('.setcanvas');
+  const c = (await canvas.boundingBox())!;
+
+  await bar.getByRole('button', { name: /^Crop/ }).click();
+  await expect(bar.getByRole('button', { name: /^Crop/ })).toHaveAttribute('aria-pressed', 'true');
+  const drag = async (x0: number, y0: number, x1: number, y1: number) => {
+    await page.mouse.move(c.x + x0, c.y + y0);
+    await page.mouse.down();
+    await page.mouse.move(c.x + x1, c.y + y1, { steps: 5 });
+    await page.mouse.up();
+  };
+  // Half the width and half the height, from a quarter in.
+  await drag(c.width * 0.25, c.height * 0.25, c.width * 0.75, c.height * 0.75);
+  await expect(bar.getByRole('button', { name: 'Undo' })).toBeEnabled();
+  // Undo takes the crop back; redo puts it back; moving it keeps its size.
+  await bar.getByRole('button', { name: 'Undo' }).click();
+  await expect(bar.getByRole('button', { name: 'Undo' })).toBeDisabled();
+  await bar.getByRole('button', { name: 'Redo' }).click();
+  await drag(c.width * 0.5, c.height * 0.5, c.width * 0.4, c.height * 0.45);
+
+  await bar.getByRole('button', { name: 'Done' }).click();
+  await expect(bar).toBeHidden();
+  await expect(box.locator('.shotmeta')).toContainText('annotated');
+  const [w1, h1] = await size();
+  expect(Math.abs(w1 - w0 / 2)).toBeLessThanOrEqual(w0 * 0.02);
+  expect(Math.abs(h1 - h0 / 2)).toBeLessThanOrEqual(h0 * 0.02);
+
+  // A click outside the crop, without a drag, keeps the whole picture again.
+  await box.getByRole('button', { name: 'Annotate screenshot 1' }).click();
+  Object.assign(c, (await canvas.boundingBox())!);
+  await bar.getByRole('button', { name: /^Crop/ }).click();
+  await drag(c.width * 0.25, c.height * 0.25, c.width * 0.75, c.height * 0.75);
+  await page.mouse.click(c.x + 4, c.y + 4);
+  await bar.getByRole('button', { name: 'Done' }).click();
+  await expect(bar).toBeHidden();
+  await expect.poll(size).toEqual([w1, h1]);
+});
+
 test('signed out, the issues and their pictures are closed; a report still files', async ({ page, context, baseURL }) => {
   await context.clearCookies();
   const origin = new URL(baseURL!).origin;

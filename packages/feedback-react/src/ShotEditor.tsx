@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
-type Tool = 'select' | 'pen' | 'arrow' | 'line' | 'box' | 'text';
+type Tool = 'select' | 'pen' | 'arrow' | 'line' | 'box' | 'text' | 'crop';
 
 interface Stroke { tool: 'pen'; colour: string; width: number; points: Array<[number, number]> }
 interface Arrow { tool: 'arrow'; colour: string; width: number; from: [number, number]; to: [number, number] }
@@ -30,7 +30,23 @@ interface Label {
   text: string;
   bold: boolean;
 }
-type Mark = Stroke | Arrow | Line | Box | Label;
+/**
+ * The part of the picture to keep, as [x0, y0, x1, y1] in image pixels; null keeps all of it.
+ * A crop is a mark like any other, so undo and redo take it back and forth; the last one is the
+ * one that counts. Nothing is cut until Done, so marks outside it are still there to drag in.
+ */
+interface Crop { tool: 'crop'; rect: [number, number, number, number] | null }
+type Mark = Stroke | Arrow | Line | Box | Label | Crop;
+
+/** The crop in force: the last crop mark's. */
+const cropOf = (all: Mark[]): Crop['rect'] => {
+  for (let i = all.length - 1; i >= 0; i -= 1) {
+    const m = all[i]!;
+    if (m.tool === 'crop') return m.rect;
+  }
+  return null;
+};
+const inside = (r: NonNullable<Crop['rect']>, p: [number, number]) => p[0] >= r[0] && p[0] <= r[2] && p[1] >= r[1] && p[1] <= r[3];
 
 const COLOURS = [
   { id: '#BF4A16', name: 'Clay' },
@@ -54,6 +70,7 @@ const ICON = {
   line: icon('M3.5 12.5l9-9'),
   box: icon('M3 4.5h10v7H3z'),
   text: icon('M3.5 4V3h9v1 M8 3v10 M6.3 13h3.4'),
+  crop: icon('M4.5 1.5v10h10 M1.5 4.5h10v10'),
   undo: icon('M5.5 3.5L2.5 6.5l3 3 M2.8 6.5H10a3.5 3.5 0 0 1 0 7H7'),
   redo: icon('M10.5 3.5l3 3-3 3 M13.2 6.5H6a3.5 3.5 0 0 0 0 7h3'),
   clear: icon('M3 4.5h10 M6.5 4.5V3h3v1.5 M4.5 4.5l.6 8.5h5.8l.6-8.5 M6.8 7v4 M9.2 7v4'),
@@ -68,6 +85,7 @@ const TOOLS: Array<{ id: Tool; glyph: React.ReactNode; name: string }> = [
   { id: 'line', glyph: ICON.line, name: 'Draw a line' },
   { id: 'box', glyph: ICON.box, name: 'Box it' },
   { id: 'text', glyph: ICON.text, name: 'Add a label' },
+  { id: 'crop', glyph: ICON.crop, name: 'Crop: drag the part to keep' },
 ];
 
 /** Stroke widths, as multiples of the width that suits the picture's size (width() below). */
@@ -299,6 +317,8 @@ export function ShotEditor({
   selectedRef.current = selected;
   const shapeDrag = useRef<{ index: number; last: [number, number] } | null>(null);
   const [drawing, setDrawing] = useState<Mark | null>(null);
+  /** A crop being drawn or moved: where the pointer went down, and the crop before it. */
+  const cropDrag = useRef<{ mode: 'new' | 'move'; start: [number, number]; from: Crop['rect'] } | null>(null);
   /** The label currently being typed or selected, by id (issue 0014). */
   const [activeId, setActiveId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -394,15 +414,19 @@ export function ShotEditor({
    * they can be moved, resized and retyped, and they are composited onto the canvas once, at
    * export. Painting them in both places would double them.
    */
-  const paint = (target: HTMLCanvasElement, all: Mark[], withText = false) => {
+  const paint = (target: HTMLCanvasElement, all: Mark[], withText = false, offset: [number, number] = [0, 0]) => {
     const img = imgRef.current;
     const ctx = target.getContext('2d');
     if (!ctx || !img) return;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, target.width, target.height);
+    // Saving a crop paints the whole picture shifted, into a canvas the crop's size.
+    ctx.translate(-offset[0], -offset[1]);
     ctx.drawImage(img, 0, 0);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     for (const m of all) {
+      if (m.tool === 'crop') continue;
       ctx.strokeStyle = m.colour;
       ctx.fillStyle = m.colour;
       if (m.tool === 'pen') {
@@ -453,7 +477,7 @@ export function ShotEditor({
     }
     // The selected shape, outlined on screen only: never in the saved image.
     const sel = selectedRef.current === null ? undefined : all[selectedRef.current];
-    if (!withText && sel && sel.tool !== 'text') {
+    if (!withText && sel && sel.tool !== 'text' && sel.tool !== 'crop') {
       const b = bounds(sel);
       const pad = sel.width + Math.max(6, target.width / 300);
       ctx.save();
@@ -465,6 +489,22 @@ export function ShotEditor({
       ctx.strokeStyle = '#EFEBE2';
       ctx.strokeRect(b.x0 - pad, b.y0 - pad, b.x1 - b.x0 + pad * 2, b.y1 - b.y0 + pad * 2);
       ctx.restore()
+    }
+    // On screen, what the crop leaves out is dimmed, and its edge drawn.
+    const crop = cropOf(all);
+    if (!withText && crop) {
+      const [x0, y0, x1, y1] = crop;
+      ctx.save();
+      ctx.fillStyle = 'rgba(26, 25, 23, 0.6)';
+      ctx.beginPath();
+      ctx.rect(0, 0, target.width, target.height);
+      ctx.rect(x0, y0, x1 - x0, y1 - y0);
+      ctx.fill('evenodd');
+      ctx.lineWidth = Math.max(1.5, target.width / 700);
+      ctx.setLineDash([Math.max(4, target.width / 250), Math.max(3, target.width / 400)]);
+      ctx.strokeStyle = '#EFEBE2';
+      ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+      ctx.restore();
     }
   };
 
@@ -523,7 +563,7 @@ export function ShotEditor({
       let hit: number | null = null;
       for (let i = marksRef.current.length - 1; i >= 0; i -= 1) {
         const m = marksRef.current[i]!;
-        if (m.tool !== 'text' && distance(m, p) <= reach + m.width / 2) { hit = i; break; }
+        if (m.tool !== 'text' && m.tool !== 'crop' && distance(m, p) <= reach + m.width / 2) { hit = i; break; }
       }
       setSelected(hit);
       if (hit !== null) {
@@ -547,6 +587,14 @@ export function ShotEditor({
     }
     // A pointer the browser already let go of cannot be captured; the stroke still starts.
     try { (e.target as Element).setPointerCapture(e.pointerId); } catch { /* already released */ }
+    if (tool === 'crop') {
+      // Inside the crop: move it. Anywhere else: draw a new one.
+      const now = cropOf(marksRef.current);
+      const moving = !!now && inside(now, p);
+      cropDrag.current = { mode: moving ? 'move' : 'new', start: p, from: now };
+      setDrawing({ tool: 'crop', rect: moving ? now : [p[0], p[1], p[0], p[1]] });
+      return;
+    }
     if (tool === 'pen') setDrawing({ tool: 'pen', colour, width: width(), points: [p] });
     else setDrawing({ tool, colour, width: width(), from: p, to: p });
   };
@@ -557,7 +605,7 @@ export function ShotEditor({
       const p = at(e);
       const [dx, dy] = [p[0] - sd.last[0], p[1] - sd.last[1]];
       sd.last = p;
-      setMarks((prev) => prev.map((m, i) => (i === sd.index && m.tool !== 'text' ? moved(m, dx, dy) : m)));
+      setMarks((prev) => prev.map((m, i) => (i === sd.index && m.tool !== 'text' && m.tool !== 'crop' ? moved(m, dx, dy) : m)));
       return;
     }
     const d = dragRef.current;
@@ -569,16 +617,43 @@ export function ShotEditor({
     }
     if (!drawing) return;
     const p = at(e);
+    const cd = cropDrag.current;
+    if (drawing.tool === 'crop' && cd) {
+      const c = canvasRef.current!;
+      const clamp = (v: number, max: number) => Math.max(0, Math.min(max, v));
+      if (cd.mode === 'move' && cd.from) {
+        const [x0, y0, x1, y1] = cd.from;
+        const dx = Math.max(-x0, Math.min(c.width - x1, p[0] - cd.start[0]));
+        const dy = Math.max(-y0, Math.min(c.height - y1, p[1] - cd.start[1]));
+        setDrawing({ tool: 'crop', rect: [x0 + dx, y0 + dy, x1 + dx, y1 + dy] });
+      } else {
+        const [ax, ay] = [clamp(cd.start[0], c.width), clamp(cd.start[1], c.height)];
+        const [bx, by] = [clamp(p[0], c.width), clamp(p[1], c.height)];
+        setDrawing({ tool: 'crop', rect: [Math.min(ax, bx), Math.min(ay, by), Math.max(ax, bx), Math.max(ay, by)] });
+      }
+      return;
+    }
     if (drawing.tool === 'pen') setDrawing({ ...drawing, points: [...drawing.points, p] });
-    else if (drawing.tool !== 'text') setDrawing({ ...drawing, to: p });
+    else if (drawing.tool !== 'text' && drawing.tool !== 'crop') setDrawing({ ...drawing, to: p });
   };
 
   const up = () => {
     if (shapeDrag.current) { shapeDrag.current = null; return; }
     if (dragRef.current) { dragRef.current = null; return; }
     if (!drawing) return;
-    addMark(drawing);
     setDrawing(null);
+    const cd = cropDrag.current;
+    cropDrag.current = null;
+    if (drawing.tool === 'crop') {
+      const r = drawing.rect;
+      const before = cd?.from ?? null;
+      // A click without a drag lets go of the crop; a crop too small to see is a slip, not a crop.
+      const tiny = !r || r[2] - r[0] < baseWidth() * 4 || r[3] - r[1] < baseWidth() * 4;
+      const next = cd?.mode === 'new' && tiny ? null : r;
+      if (JSON.stringify(next) !== JSON.stringify(before)) addMark({ tool: 'crop', rect: next });
+      return;
+    }
+    addMark(drawing);
   };
 
   activeIdRef.current = activeId;
@@ -674,9 +749,11 @@ export function ShotEditor({
   const save = () => {
     const out = document.createElement('canvas');
     const c = canvasRef.current!;
-    out.width = c.width;
-    out.height = c.height;
-    paint(out, marksRef.current, true);
+    const crop = cropOf(marksRef.current);
+    const [x0, y0, x1, y1] = crop ? crop.map(Math.round) as [number, number, number, number] : [0, 0, c.width, c.height];
+    out.width = Math.max(1, x1 - x0);
+    out.height = Math.max(1, y1 - y0);
+    paint(out, marksRef.current, true, [x0, y0]);
     onSave(out.toDataURL('image/png'));
   };
 
@@ -784,7 +861,7 @@ export function ShotEditor({
                     {colourPicks(colour, (next) => {
                       setColour(next);
                       // A selected shape takes the new color too.
-                      if (selected !== null) setMarks((prev) => prev.map((m, i) => (i === selected ? { ...m, colour: next } : m)));
+                      if (selected !== null) setMarks((prev) => prev.map((m, i) => (i === selected && m.tool !== 'crop' ? { ...m, colour: next } : m)));
                     })}
                   </div>
                   <div className="setcolrow" role="group" aria-label="Stroke width">
@@ -801,7 +878,7 @@ export function ShotEditor({
                           // A selected shape takes the new width too.
                           if (selected !== null) {
                             const next = Math.max(1, Math.round(baseWidth() * w.id));
-                            setMarks((prev) => prev.map((m, i) => (i === selected && m.tool !== 'text' ? { ...m, width: next } : m)));
+                            setMarks((prev) => prev.map((m, i) => (i === selected && m.tool !== 'text' && m.tool !== 'crop' ? { ...m, width: next } : m)));
                           }
                         }}
                       >
@@ -973,7 +1050,8 @@ export function ShotEditor({
       <p className="setnote">
         {marks.length} mark{marks.length === 1 ? '' : 's'} · <b>{mod}Z</b> undo · <b>{mod}⇧Z</b> redo ·{' '}
         the arrow tool selects a mark: drag it to move it, <b>Delete</b> removes it, and a color or
-        stroke width picked while it is selected applies to it ·{' '}
+        stroke width picked while it is selected applies to it · crop: drag the part to keep, drag
+        inside it to move it, click outside it to keep the whole picture again ·{' '}
         <b>Esc</b> leaves the text field, then the selection, then the editor. A label widens as
         you type until it reaches the edge of the picture, then wraps; drag it to move it, drag its
         corner to set its size, double-click to retype it. <b>Return</b> inside one is a line
