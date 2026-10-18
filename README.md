@@ -198,6 +198,26 @@ export default function Issue({ params }: { params: Promise<{ id: string }> }) {
 
 (The example's list page reads the store on the server instead and passes `issues` in; either works.)
 
+**6. Let your dev agents in.** With `authorize` set, only signed-in users can read issues, so the
+agents that fix them can't. Give them the worker token: generate a long random secret, set it as
+`FEEDBACK_WORKER_TOKEN` on the server, and put it in the agents' environment (with the app's host in
+their allowed domains). With it they read, and update, issues with no session:
+
+```sh
+curl -H "Authorization: Bearer $FEEDBACK_WORKER_TOKEN" "$APP/api/issues?status=open"   # also /api/issues/<id> and its attachments
+curl -X PATCH -H "Authorization: Bearer $FEEDBACK_WORKER_TOKEN" -H 'content-type: application/json' \
+  -d '{"status":"triaged"}' "$APP/api/issues/0001"
+```
+
+The handler logs a hint at startup while issues are locked and no token is set. To have a filing wake
+an agent, add `worker` too ([TRIAGE.md §8](docs/TRIAGE.md#one-worker-at-a-time-woken-by-a-filing)).
+If your app proxies `/api/feedback` and `/api/issues` to the kit, forward the `Authorization` header.
+
+**Use the kit as it ships.** Copy the client in whole and restyle it only through its CSS variables
+and stylesheet. Keep its UX the same: the automatic screenshot, region capture, annotation, drag-drop
+and paste of images, drafts and the offline outbox are the point of the kit, so don't rebuild the
+drawer or drop parts of it to fit your app.
+
 Also: add the class `nocapture` to anything that must never appear in an automatic screenshot, and
 keep `.data/` (or wherever `FEEDBACK_DATA` points) out of git, because reports and screenshots hold
 whatever was on screen. Plain Node, Express, SQLite, Postgres and GitHub Issues are in the

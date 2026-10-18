@@ -158,3 +158,29 @@ test('routineWake fires the routine with the beta header and no reporter text', 
   const failing = routineWake({ url: 'https://x.test/fire', token: 't', fetch: (async () => new Response('', { status: 429 })) as unknown as typeof fetch });
   await assert.rejects(failing({ id: '1' } as unknown as Issue), /429/);
 });
+
+test('the worker token alone lets dev agents read and triage issues; without one, the handler says how', async (t) => {
+  const root = await tempDir(t);
+  const journal = createJournal(join(root, 'inbox'));
+  const store = fileStore(join(root, 'issues'));
+  const said: string[] = [];
+  const handler = createFeedbackHandler({ journal, store, workerToken: 'dev-token', authorize: () => false, onJournaled: () => undefined, logger: { info: (m: string) => said.push(m) } });
+  assert.equal(said.length, 0);
+  const ingester = createIngester({ journal, store, generateTitle: null, logger: silent });
+  await handler.handle(post(wire()));
+  await ingester.runOnce();
+
+  const auth = { authorization: 'Bearer dev-token' };
+  assert.equal((await handler.handle(get('/api/issues'))).status, 403);
+  assert.equal((await handler.handle(get('/api/issues', auth))).status, 200);
+  const patch = await handler.handle(new Request('http://app.test/api/issues/0001', {
+    method: 'PATCH', headers: { host: 'app.test', 'content-type': 'application/json', ...auth }, body: JSON.stringify({ status: 'triaged' }),
+  }));
+  assert.equal(patch.status, 200);
+  // No worker dispatch: the queue endpoint stays off.
+  assert.equal((await handler.handle(get('/api/feedback/worker?id=s1', auth))).status, 404);
+
+  createFeedbackHandler({ journal, store, workerToken: () => undefined, authorize: () => false, onJournaled: () => undefined, logger: { info: (m: string) => said.push(m) } });
+  assert.equal(said.length, 1);
+  assert.match(said.join(), /FEEDBACK_WORKER_TOKEN/);
+});

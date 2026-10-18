@@ -4,6 +4,11 @@ Both packages share one version.
 
 ## Unreleased
 
+- **The worker token is for every dev agent** (18 Oct 2026): `FEEDBACK_WORKER_TOKEN` now reads and
+  updates issues even without `worker`, the handler logs a startup hint while `authorize` locks issues
+  and no token is set, and the README's quick start has a step for it. Adopters were leaving it unset,
+  so their agents couldn't read the feedback they were meant to fix. The README also says to keep the
+  client's UX as it ships (screenshot, annotation, drag-drop) and restyle only through CSS.
 - **Crop** in the annotator (8 Oct 2026): drag the part of the screenshot to keep, move it, or click
   outside it to keep the whole picture. It is undoable like a mark, and the saved picture is the
   crop's size.
