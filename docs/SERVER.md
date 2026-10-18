@@ -147,6 +147,10 @@ served when `createFeedbackHandler({ worker })` is given a `createWorkerDispatch
 `FEEDBACK_WORKER_TOKEN` (or `workerToken`) is set; otherwise 404. `Authorization: Bearer <token>`,
 compared in constant time; anything else is 401.
 
+The same token reads and updates issues (`/api/issues…`, their attachments, `PATCH`) without a session
+or an Origin, with or without `worker`. It is how an app's dev agents get at its feedback, so set it
+whenever `authorize` locks issues to signed-in users; the handler logs a hint at startup until you do.
+
 - `GET {base}/worker?id=<worker id>` checks in and answers `{ retire, startedAt, cursor, issues }`:
   every `open` issue, oldest first. 409 `{ holder, seenAt }` when another live worker holds the queue.
 - `&wait=<seconds>&after=<cursor>` waits (at most 9 minutes) for a filing after the cursor of the last

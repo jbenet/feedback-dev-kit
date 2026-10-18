@@ -84,12 +84,18 @@ export interface HandlerOptions {
    */
   mcp?: Omit<FeedbackMcpOptions, 'journal' | 'store'>;
   /**
-   * Serve `${basePath}/worker` for the one agent working the queue (worker.ts, docs/TRIAGE.md §8). Its
-   * bearer token (workerToken) also lets it read and update issues, without a session or an Origin.
+   * Serve `${basePath}/worker` for the one agent working the queue (worker.ts, docs/TRIAGE.md §8).
+   * Needs workerToken too.
    */
   worker?: WorkerDispatch;
-  /** Bearer token for the worker. Default: FEEDBACK_WORKER_TOKEN. Unset: the worker endpoint answers 404. */
+  /**
+   * The token your dev agents use: `Authorization: Bearer <token>` reads and updates issues without a
+   * session or an Origin, with or without `worker`. Default: FEEDBACK_WORKER_TOKEN. A function is read
+   * on every request, so a rotated token works at once. Unset: only `authorize` lets anyone read.
+   */
   workerToken?: string | (() => string | undefined);
+  /** Where the hint about a missing worker token goes (said once, when the handler is made). Default: console. null: nowhere. */
+  logger?: Pick<Console, 'info'> | null;
 }
 
 export interface FeedbackHandler {
@@ -135,7 +141,13 @@ export function createFeedbackHandler(options: HandlerOptions): FeedbackHandler 
     const supplied = Buffer.from(req.headers.get('authorization') ?? '');
     return expected.length === supplied.length && timingSafeEqual(expected, supplied);
   };
-  const isWorker = (req: Request) => !!options.worker && bearer(req, workerToken());
+  const isWorker = (req: Request) => bearer(req, workerToken());
+  // Issues locked to sessions and no token: say once how to let the app's dev agents in.
+  if (options.authorize && !workerToken()) {
+    (options.logger === undefined ? console : options.logger)?.info(
+      '[feedback] Only signed-in users can read issues. To let your dev agents read and triage them, set FEEDBACK_WORKER_TOKEN '
+      + 'and give it to them as a Bearer token (docs/TRIAGE.md §8).');
+  }
 
   async function allowed(req: Request, action: Action): Promise<Response | null> {
     if (isWorker(req)) return null;

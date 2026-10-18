@@ -78,7 +78,7 @@ startFeedbackIngester();
 | `POST /api/feedback` | Journal a report. 202 `{ journaled: true, clientId, repeat, id? }` once it is on disk. |
 | `GET /api/feedback?clientId=…` | `{ state: 'journaled' }`, `{ state: 'filed', id, location }`, `{ state: 'refused', error }`, or 404 `{ state: 'unknown' }`. Reads the journal only. |
 | `GET /api/feedback/export?since=<ISO with zone>` | `{ items: Issue[] }` created after `since`. `Authorization: Bearer $FEEDBACK_EXPORT_TOKEN`; 404 when unset, 401 when wrong, 400 for a bad `since`. |
-| `GET /api/feedback/worker?id=…[&wait=&after=]` | The one agent working the queue checks in (and long-polls): `{ retire, startedAt, cursor, issues }` of open issues, or 409 when another holds it. `DELETE` releases. `Authorization: Bearer $FEEDBACK_WORKER_TOKEN`, which also reads and updates issues; 404 without `worker` or a token. See [One worker at a time](#one-worker-at-a-time). |
+| `GET /api/feedback/worker?id=…[&wait=&after=]` | The one agent working the queue checks in (and long-polls): `{ retire, startedAt, cursor, issues }` of open issues, or 409 when another holds it. `DELETE` releases. `Authorization: Bearer $FEEDBACK_WORKER_TOKEN`, which also reads and updates issues (with or without `worker`); the endpoint is 404 without `worker` or a token. See [One worker at a time](#one-worker-at-a-time). |
 | `GET /api/issues` | `{ issues: Issue[], destination, store }`, newest first. Optional `status`, `kind`, `priority` (comma lists), `q`. |
 | `GET /api/issues/:id` | `{ issue }` or 404. |
 | `PATCH /api/issues/:id` | `{ status?, priority?, kind?, labels? }` → `{ issue }`. Same-origin only. Records `closed_at` on done and clears it on reopen. |
@@ -123,7 +123,8 @@ The server also accepts `client_id`, an optional `title` (from agents filing thr
 | `onSuspicious` | `'flag'` | `'refuse'` answers 422 when the report matches the prompt-injection patterns ([Prompt injection](#prompt-injection)); the browser keeps it and shows the reason. `'flag'` leaves it to the ingester. |
 | `onJournaled(clientId)` | kick the ingester | |
 | `worker` | none | A `createWorkerDispatch()`: serves `{base}/worker`. |
-| `workerToken` | `$FEEDBACK_WORKER_TOKEN` | |
+| `workerToken` | `$FEEDBACK_WORKER_TOKEN` | Bearer token for your dev agents: reads and updates issues with no session. Set it whenever `authorize` is set. A function is read per request. |
+| `logger` | `console` | Where the startup hint about a missing worker token goes; `null` for nowhere. |
 
 ### `startIngester(options)` / `createIngester(options)`
 
@@ -388,7 +389,7 @@ from `FEEDBACK_GITHUB_PICTURES` in `examples/next-app/lib/feedback.ts`; add a br
 | Variable | Read by | |
 |---|---|---|
 | `FEEDBACK_EXPORT_TOKEN` | `createFeedbackHandler` | Enables `GET /api/feedback/export` with this bearer token. Unset: 404. |
-| `FEEDBACK_WORKER_TOKEN` | `createFeedbackHandler` | Enables `{base}/worker` (with `worker`) for this bearer token. Unset: 404. |
+| `FEEDBACK_WORKER_TOKEN` | `createFeedbackHandler` | Lets this bearer token read and update issues (your dev agents), and enables `{base}/worker` (with `worker`). Unset: only `authorize` reads, and the worker endpoint is 404. |
 | `FEEDBACK_TITLE_API_KEY`, then `ANTHROPIC_API_KEY` | `anthropicTitle`, the default `generateTitle` | Titles by Claude. Unset: no model is called. |
 | `FEEDBACK_TITLE_MODEL` | `anthropicTitle` | Default `claude-haiku-4-5`. |
 | `FEEDBACK_TITLE_SCREENSHOT` | `anthropicTitle` | `0` keeps the screenshot out of the title request. |
