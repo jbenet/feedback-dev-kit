@@ -16,7 +16,8 @@ export const SHORTCUT_GROUPS = [
   { id: 'screenshot', title: 'Screenshot editor', shortcuts: [
     { keys: [['Mod', 'Z']], description: 'Undo an annotation, outside text fields' },
     { keys: [['Mod', 'Shift', 'Z'], ['Mod', 'Y']], description: 'Redo an annotation, outside text fields' },
-    { keys: [['Mod', 'Enter']], description: 'Keep the label text and leave its field' },
+    { keys: [['Mod', 'Enter']], description: 'Done: keep the annotations, even from a label being typed' },
+    { keys: [['Enter']], description: 'Cut the picture down to the crop drawn; undo puts the rest back' },
     { keys: [['Enter']], description: 'Apply the text size while editing its number' },
     { keys: [['Esc']], description: 'Leave a field keeping its text, deselect a label, then close the editor' },
     { keys: [['Enter']], description: 'Use the region drawn, when choosing a part of the page' },
