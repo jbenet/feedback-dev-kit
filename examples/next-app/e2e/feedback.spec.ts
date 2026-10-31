@@ -449,6 +449,55 @@ test('the annotator crops: drag the part to keep, undo it, and the saved picture
   await expect.poll(size).toEqual([w1, h1]);
 });
 
+test('the annotator keys: Return cuts to the crop in place, Mod+Return is Done even from a label', async ({ page }) => {
+  await page.goto('/');
+  const box = await openWithShortcut(page);
+  const thumb = box.getByRole('img', { name: 'Screenshot 1' });
+  const size = () => thumb.evaluate((img: HTMLImageElement) => new Promise<[number, number]>((r) => {
+    const done = () => r([img.naturalWidth, img.naturalHeight]);
+    if (img.complete && img.naturalWidth) done(); else img.addEventListener('load', done, { once: true });
+  }));
+  const [w0, h0] = await size();
+  await box.getByRole('button', { name: 'Annotate screenshot 1' }).click();
+  const bar = page.getByRole('toolbar', { name: 'Annotation tools' });
+  const canvas = page.locator('.setcanvas');
+  const c = (await canvas.boundingBox())!;
+  const pixels = () => canvas.evaluate((el: HTMLCanvasElement) => [el.width, el.height]);
+  expect(await pixels()).toEqual([w0, h0]);
+
+  await bar.getByRole('button', { name: /^Crop/ }).click();
+  await page.mouse.move(c.x + c.width * 0.25, c.y + c.height * 0.25);
+  await page.mouse.down();
+  await page.mouse.move(c.x + c.width * 0.75, c.y + c.height * 0.75, { steps: 5 });
+  await page.mouse.up();
+  // Return redraws the editor with just that part; undo brings the whole picture back.
+  await page.keyboard.press('Enter');
+  await expect.poll(pixels).not.toEqual([w0, h0]);
+  const [cw, ch] = await pixels();
+  expect(Math.abs(cw - w0 / 2)).toBeLessThanOrEqual(w0 * 0.02);
+  expect(Math.abs(ch - h0 / 2)).toBeLessThanOrEqual(h0 * 0.02);
+  await bar.getByRole('button', { name: 'Undo' }).click();
+  await expect.poll(pixels).toEqual([w0, h0]);
+  await bar.getByRole('button', { name: 'Redo' }).click();
+  await expect.poll(pixels).toEqual([cw, ch]);
+
+  // A label typed on the cropped picture, then Mod+Return from inside it: Done, with the label.
+  await bar.getByRole('button', { name: 'Add a label' }).click();
+  const k = (await canvas.boundingBox())!;
+  await page.mouse.click(k.x + k.width * 0.3, k.y + k.height * 0.3);
+  const field = page.getByRole('textbox', { name: 'Label text' });
+  await expect(field).toBeFocused();
+  await page.keyboard.type('here');
+  await page.keyboard.press('Enter');
+  await expect(field).toHaveValue('here\n');
+  await expect(bar).toBeVisible();
+  await page.keyboard.press('ControlOrMeta+Enter');
+  await expect(bar).toBeHidden();
+  // The box is still open: the same keys did not also file the report.
+  await expect(box.locator('.shotmeta')).toContainText('annotated');
+  await expect.poll(size).toEqual([cw, ch]);
+});
+
 test('signed out, the issues and their pictures are closed; a report still files', async ({ page, context, baseURL }) => {
   await context.clearCookies();
   const origin = new URL(baseURL!).origin;

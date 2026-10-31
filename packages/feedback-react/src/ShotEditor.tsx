@@ -33,20 +33,31 @@ interface Label {
 /**
  * The part of the picture to keep, as [x0, y0, x1, y1] in image pixels; null keeps all of it.
  * A crop is a mark like any other, so undo and redo take it back and forth; the last one is the
- * one that counts. Nothing is cut until Done, so marks outside it are still there to drag in.
+ * one that counts. Until Return applies it, a crop only dims what it leaves out, so marks
+ * outside it are still there to drag in. An applied crop is what the editor shows from then
+ * on; nothing is thrown away, and undo brings the rest of the picture back.
  */
-interface Crop { tool: 'crop'; rect: [number, number, number, number] | null }
+interface Crop { tool: 'crop'; rect: [number, number, number, number] | null; applied?: boolean }
 type Mark = Stroke | Arrow | Line | Box | Label | Crop;
+type Rect = NonNullable<Crop['rect']>;
 
-/** The crop in force: the last crop mark's. */
+/** The crop waiting for Return or Done: the last crop mark's, unless that one was applied. */
 const cropOf = (all: Mark[]): Crop['rect'] => {
   for (let i = all.length - 1; i >= 0; i -= 1) {
     const m = all[i]!;
-    if (m.tool === 'crop') return m.rect;
+    if (m.tool === 'crop') return m.applied ? null : m.rect;
   }
   return null;
 };
-const inside = (r: NonNullable<Crop['rect']>, p: [number, number]) => p[0] >= r[0] && p[0] <= r[2] && p[1] >= r[1] && p[1] <= r[3];
+/** The part of the picture on screen: the last applied crop, or all of it. */
+const viewOf = (all: Mark[], w: number, h: number): Rect => {
+  for (let i = all.length - 1; i >= 0; i -= 1) {
+    const m = all[i]!;
+    if (m.tool === 'crop' && m.applied && m.rect) return m.rect;
+  }
+  return [0, 0, w, h];
+};
+const inside = (r: Rect, p: [number, number]) => p[0] >= r[0] && p[0] <= r[2] && p[1] >= r[1] && p[1] <= r[3];
 
 const COLOURS = [
   { id: '#BF4A16', name: 'Clay' },
@@ -85,7 +96,7 @@ const TOOLS: Array<{ id: Tool; glyph: React.ReactNode; name: string }> = [
   { id: 'line', glyph: ICON.line, name: 'Draw a line' },
   { id: 'box', glyph: ICON.box, name: 'Box it' },
   { id: 'text', glyph: ICON.text, name: 'Add a label' },
-  { id: 'crop', glyph: ICON.crop, name: 'Crop: drag the part to keep' },
+  { id: 'crop', glyph: ICON.crop, name: 'Crop: drag the part to keep, Return to cut it' },
 ];
 
 /** Stroke widths, as multiples of the width that suits the picture's size (width() below). */
@@ -420,7 +431,7 @@ export function ShotEditor({
     if (!ctx || !img) return;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, target.width, target.height);
-    // Saving a crop paints the whole picture shifted, into a canvas the crop's size.
+    // A crop, saved or applied, paints the whole picture shifted, into a canvas the crop's size.
     ctx.translate(-offset[0], -offset[1]);
     ctx.drawImage(img, 0, 0);
     ctx.lineCap = 'round';
@@ -497,7 +508,7 @@ export function ShotEditor({
       ctx.save();
       ctx.fillStyle = 'rgba(26, 25, 23, 0.6)';
       ctx.beginPath();
-      ctx.rect(0, 0, target.width, target.height);
+      ctx.rect(offset[0], offset[1], target.width, target.height);
       ctx.rect(x0, y0, x1 - x0, y1 - y0);
       ctx.fill('evenodd');
       ctx.lineWidth = Math.max(1.5, target.width / 700);
@@ -508,19 +519,43 @@ export function ShotEditor({
     }
   };
 
+  /** The part of the picture on screen, in image pixels. Marks keep the whole picture's. */
+  const view = (all: Mark[] = marksRef.current): Rect => {
+    const img = imgRef.current;
+    return viewOf(all, img?.naturalWidth ?? canvasRef.current?.width ?? 1400, img?.naturalHeight ?? canvasRef.current?.height ?? 1400);
+  };
+
   useEffect(() => {
     const c = canvasRef.current;
-    if (c && ready) paint(c, drawing ? [...marks, drawing] : marks, false);
+    if (!c || !ready) return;
+    // The canvas is the size of what is shown, so an applied crop fills the editor.
+    const [x0, y0, x1, y1] = view(marks);
+    if (c.width !== x1 - x0) c.width = x1 - x0;
+    if (c.height !== y1 - y0) c.height = y1 - y0;
+    paint(c, drawing ? [...marks, drawing] : marks, false, [x0, y0]);
   }, [marks, drawing, ready, selected]);
 
   /** Pointer position in image pixels, whatever size the canvas is displayed at. */
   const at = (e: React.PointerEvent | React.MouseEvent): [number, number] => {
     const c = canvasRef.current!;
     const r = c.getBoundingClientRect();
+    const [x0, y0] = view();
     return [
-      ((e.clientX - r.left) / r.width) * c.width,
-      ((e.clientY - r.top) / r.height) * c.height,
+      x0 + ((e.clientX - r.left) / r.width) * c.width,
+      y0 + ((e.clientY - r.top) / r.height) * c.height,
     ];
+  };
+
+  /**
+   * Return on a pending crop cuts the picture down to it, there and then. It is one more crop
+   * mark, so undo puts the rest of the picture back. Rounded, so the canvas is whole pixels.
+   */
+  const applyCrop = () => {
+    const r = cropOf(marksRef.current);
+    if (!r) return false;
+    setSelected(null);
+    addMark({ tool: 'crop', rect: r.map(Math.round) as Rect, applied: true });
+    return true;
   };
 
   /** The picture's natural stroke width, times the chosen weight. */
@@ -545,7 +580,7 @@ export function ShotEditor({
    */
   const fit = (l: Label): Label => {
     if (l.sized) return l;
-    const room = Math.max(l.size * 2, (canvasRef.current?.width ?? 1400) - l.at[0] - l.size * 0.25);
+    const room = Math.max(l.size * 2, view()[2] - l.at[0] - l.size * 0.25);
     const longest = Math.max(...(l.text || PLACEHOLDER).split('\n').map((s) => textWidth(s, l.size, l.bold)));
     // A fifth of an em over the text: room for the caret, and for the field's own rounding,
     // so it never wraps a line the saved image would not.
@@ -619,16 +654,17 @@ export function ShotEditor({
     const p = at(e);
     const cd = cropDrag.current;
     if (drawing.tool === 'crop' && cd) {
-      const c = canvasRef.current!;
-      const clamp = (v: number, max: number) => Math.max(0, Math.min(max, v));
+      // Inside what is on screen: after a crop is applied, that is all there is to crop.
+      const [vx0, vy0, vx1, vy1] = view();
+      const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
       if (cd.mode === 'move' && cd.from) {
         const [x0, y0, x1, y1] = cd.from;
-        const dx = Math.max(-x0, Math.min(c.width - x1, p[0] - cd.start[0]));
-        const dy = Math.max(-y0, Math.min(c.height - y1, p[1] - cd.start[1]));
+        const dx = clamp(p[0] - cd.start[0], vx0 - x0, vx1 - x1);
+        const dy = clamp(p[1] - cd.start[1], vy0 - y0, vy1 - y1);
         setDrawing({ tool: 'crop', rect: [x0 + dx, y0 + dy, x1 + dx, y1 + dy] });
       } else {
-        const [ax, ay] = [clamp(cd.start[0], c.width), clamp(cd.start[1], c.height)];
-        const [bx, by] = [clamp(p[0], c.width), clamp(p[1], c.height)];
+        const [ax, ay] = [clamp(cd.start[0], vx0, vx1), clamp(cd.start[1], vy0, vy1)];
+        const [bx, by] = [clamp(p[0], vx0, vx1), clamp(p[1], vy0, vy1)];
         setDrawing({ tool: 'crop', rect: [Math.min(ax, bx), Math.min(ay, by), Math.max(ax, bx), Math.max(ay, by)] });
       }
       return;
@@ -708,11 +744,18 @@ export function ShotEditor({
 
   /**
    * The shortcuts people already have in their fingers. Suppressed while a label is being
-   * typed, where the browser's own undo belongs to the input.
+   * typed, where the browser's own undo belongs to the input — except ⌘/Ctrl+Return, which
+   * finishes from anywhere, the way it files the report in the box underneath.
    */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const inText = e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement;
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !e.isComposing) {
+        if (eyeOpenRef.current) return;
+        e.preventDefault();
+        save();
+        return;
+      }
       if (e.key === 'Escape') {
         if (eyeOpenRef.current) return;
         /**
@@ -739,18 +782,24 @@ export function ShotEditor({
         setMarks((prev) => prev.filter((_, i) => i !== gone));
         return;
       }
+      // Return cuts to a pending crop. Plain Return never finishes: a second press after a
+      // crop would close the editor before anyone had looked at what it kept.
+      if (e.key === 'Enter' && !e.shiftKey && !e.altKey && !e.isComposing && !(e.target instanceof HTMLSelectElement) && cropOf(marksRef.current)) {
+        e.preventDefault();
+        applyCrop();
+        return;
+      }
       if (isUndo(e)) { e.preventDefault(); undo(); }
       else if (isRedo(e)) { e.preventDefault(); redo(); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [undo, redo, onCancel, editingId]);
+  }, [undo, redo, onCancel, onSave, editingId]);
 
   const save = () => {
     const out = document.createElement('canvas');
-    const c = canvasRef.current!;
-    const crop = cropOf(marksRef.current);
-    const [x0, y0, x1, y1] = crop ? crop.map(Math.round) as [number, number, number, number] : [0, 0, c.width, c.height];
+    const crop = cropOf(marksRef.current) ?? view();
+    const [x0, y0, x1, y1] = crop.map(Math.round) as Rect;
     out.width = Math.max(1, x1 - x0);
     out.height = Math.max(1, y1 - y0);
     paint(out, marksRef.current, true, [x0, y0]);
@@ -811,11 +860,13 @@ export function ShotEditor({
   );
 
   const c = canvasRef.current;
-  const W = c?.width || 1;
-  const H = c?.height || 1;
+  /** What is on screen, from the marks: the canvas itself is resized a moment later. */
+  const V = ready ? view(marks) : [0, 0, c?.width || 1, c?.height || 1];
+  const W = V[2] - V[0] || 1;
+  const H = V[3] - V[1] || 1;
   /** The picture's width on screen, and screen pixels per image pixel. */
-  const shown = c ? shownWidth || c.getBoundingClientRect().width || c.width : 1;
-  const scale = c && c.width ? shown / c.width : 1;
+  const shown = c ? shownWidth || c.getBoundingClientRect().width || W : 1;
+  const scale = c ? shown / W : 1;
   const active = labelOf(activeId);
 
   return (
@@ -903,7 +954,7 @@ export function ShotEditor({
               <button type="button" className="seticon" onClick={onCancel}
                 aria-label="Cancel" aria-keyshortcuts="Escape" data-tip="Cancel (Esc)">{ICON.close}</button>
               <button type="button" className="seticon p" onClick={save}
-                aria-label="Done" data-tip="Done: keep the annotations">{ICON.done}</button>
+                aria-label="Done" aria-keyshortcuts="Meta+Enter Control+Enter" data-tip={`Done: keep the annotations (${mod}↵)`}>{ICON.done}</button>
             </div>
           </div>
 
@@ -921,15 +972,18 @@ export function ShotEditor({
             />
             {/* Placed labels are DOM objects: move them, resize them, type in them again.
                 They are composited onto the image at export. */}
-            {marks.filter((m): m is Label => m.tool === 'text').map((l) => {
+            {/* A label cut off by an applied crop is not shown; undo brings it back. */}
+            {marks.filter((m): m is Label => m.tool === 'text' && (m.id === editingId || (
+              m.at[0] < V[2] && m.at[0] + m.width > V[0] && m.at[1] < V[3] && m.at[1] + Math.max(m.height, m.size * LEADING) > V[1]
+            ))).map((l) => {
               const editing = editingId === l.id;
               return (
                 <div
                   key={l.id}
                   className={`setlabel${activeId === l.id ? ' on' : ''}${editing ? ' editing' : ''}`}
                   style={{
-                    left: `${(l.at[0] / W) * 100}%`,
-                    top: `${(l.at[1] / H) * 100}%`,
+                    left: `${((l.at[0] - V[0]) / W) * 100}%`,
+                    top: `${((l.at[1] - V[1]) / H) * 100}%`,
                     color: l.colour,
                     fontWeight: l.bold ? 600 : 400,
                     // Not rounded: the field wraps where the saved image will.
@@ -976,8 +1030,8 @@ export function ShotEditor({
                         onChange={(e) => patch(l.id, { text: e.target.value })}
                         onKeyDown={(e) => {
                           // Return is a line break. Escape leaves the field and keeps the text.
+                          // ⌘/Ctrl+Return goes on to the editor, which finishes with the label in it.
                           if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); stopEditing(); }
-                          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); stopEditing(); }
                         }}
                       />
                     )}
@@ -1009,8 +1063,8 @@ export function ShotEditor({
                 style={{
                   // Kept inside the picture: beside a label near the right-hand edge it ran off
                   // the screen, with Done and × in the part that was cut off.
-                  left: `${Math.max(0, Math.min(active.at[0] * scale - 6, shown - barWidth))}px`,
-                  top: `${(active.at[1] / H) * 100}%`,
+                  left: `${Math.max(0, Math.min((active.at[0] - V[0]) * scale - 6, shown - barWidth))}px`,
+                  top: `${((active.at[1] - V[1]) / H) * 100}%`,
                 }}
                 // A button here must not take the caret out of the label. The size, the list
                 // of sizes and the colour field do need the focus they are clicked for.
@@ -1051,7 +1105,8 @@ export function ShotEditor({
         {marks.length} mark{marks.length === 1 ? '' : 's'} · <b>{mod}Z</b> undo · <b>{mod}⇧Z</b> redo ·{' '}
         the arrow tool selects a mark: drag it to move it, <b>Delete</b> removes it, and a color or
         stroke width picked while it is selected applies to it · crop: drag the part to keep, drag
-        inside it to move it, click outside it to keep the whole picture again ·{' '}
+        inside it to move it, click outside it to keep the whole picture again, <b>Return</b> cuts
+        the picture down to it · <b>{mod}Return</b> is Done ·{' '}
         <b>Esc</b> leaves the text field, then the selection, then the editor. A label widens as
         you type until it reaches the edge of the picture, then wraps; drag it to move it, drag its
         corner to set its size, double-click to retype it. <b>Return</b> inside one is a line

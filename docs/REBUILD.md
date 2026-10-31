@@ -448,7 +448,10 @@ Full-screen over everything (`nocapture`), editing one image (a screenshot or a 
   image pixels, position, wrap width, a `sized` flag once the corner is dragged, a min height, text with
   newlines, bold), `crop` (a rect in image pixels, or null for the whole picture; the last crop mark
   counts, so undo takes it back; dimmed outside on screen; at export the canvas is the crop's size and
-  everything is painted shifted by its corner). Default tool: pen. Default colour: the accent (clay `#BF4A16`). Palette: `#BF4A16`,
+  everything is painted shifted by its corner; `applied: true` when Return cut the editor down to it,
+  after which the canvas is that rect's size, everything is painted shifted by its corner on screen
+  too, pointer positions add the corner back, labels outside it are not rendered, and new crops stay
+  inside it). Default tool: pen. Default colour: the accent (clay `#BF4A16`). Palette: `#BF4A16`,
   `#0E7F55`, `#5F4B9E`, `#1A1917`, `#FFFFFF`, a custom `<input type="color">` (it takes `#rrggbb` only;
   normalise `rgb()` and `#rgb`), and `EyeDropper` where it exists (do not draw the button elsewhere; while
   it is open, ignore Esc).
@@ -653,7 +656,8 @@ One table drives the app's shortcuts dialog and the panel's keys card:
 | Feedback box | Esc | Close the keys panel first, then the box |
 | Feedback box | Tab / Shift+Tab | Move to the next or previous field |
 | Screenshot editor | Mod+Z; Mod+Shift+Z / Mod+Y | Undo; redo, outside text fields |
-| Screenshot editor | Mod+Enter | Keep the label text and leave its field |
+| Screenshot editor | Mod+Enter | Done: keep the annotations, even from a label being typed |
+| Screenshot editor | Enter | Cut the picture down to the crop drawn; undo puts the rest back |
 | Screenshot editor | Esc | Leave a field, deselect a label, then close the editor |
 | Screenshot editor | Esc | Cancel choosing a screenshot region |
 

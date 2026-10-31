@@ -153,8 +153,12 @@ unsupported, or it took too long. Everything else still files."
 - Tools: select, freehand pen (the default), arrow, line, box, text label, and crop.
 - **Crop**: drag the part of the picture to keep; what it leaves out is dimmed. Drag inside the crop
   to move it, drag elsewhere for a new one, click outside it to keep the whole picture again. Undo
-  and Redo take it back and forth like a mark. Nothing is cut until **Done**, so marks outside the
-  crop can still be dragged in; the saved picture is the crop's size.
+  and Redo take it back and forth like a mark. **Return** cuts the picture down to the crop in the
+  editor, so you can keep annotating the part that matters at a bigger size; marks and labels cut off
+  are hidden, and Undo puts the whole picture back. Without Return, nothing is cut until **Done**, so
+  marks outside the crop can still be dragged in; the saved picture is the crop's size.
+- **⌘/Ctrl+Return** is **Done** from anywhere in the editor, even while a label is being typed. Plain
+  Return never finishes: it is a line break in a label and applies a crop.
 - **Select** (the pointer) is also the way out of another tool. Click a mark to select it (a dashed
   outline, never saved); drag to move it; **Delete** or **Backspace** removes it; a color or stroke
   width picked while it is selected applies to it. Esc deselects.

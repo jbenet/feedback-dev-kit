@@ -4,6 +4,10 @@ Both packages share one version.
 
 ## Unreleased
 
+- **Annotator keys** (31 Oct 2026): **Return** on a pending crop cuts the picture down to it in the
+  editor, there and then (undo puts the rest back), and **⌘/Ctrl+Return** is Done from anywhere in the
+  editor, a label being typed included. Plain Return never finishes, so it can't close the editor by
+  accident after a crop or inside a label.
 - **The worker token is for every dev agent** (18 Oct 2026): `FEEDBACK_WORKER_TOKEN` now reads and
   updates issues even without `worker`, the handler logs a startup hint while `authorize` locks issues
   and no token is set, and the README's quick start has a step for it. Adopters were leaving it unset,
