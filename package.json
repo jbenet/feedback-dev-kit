@@ -1,7 +1,7 @@
 {
   "name": "feedback-kit",
   "private": true,
-  "description": "An in-app feedback module for React apps: a client package, a journal-first server package, and an example Next.js app.",
+  "description": "An in-app feedback module for any React app: a client package, a journal-first server package, and two examples (Next.js, and Vite with plain Node).",
   "workspaces": [
     "packages/*",
     "examples/*"
@@ -11,6 +11,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm test --workspaces --if-present",
     "dev": "npm run dev -w examples/next-app",
+    "dev:vite": "npm run dev -w examples/vite-app",
     "e2e": "npm run e2e -w examples/next-app"
   },
   "devDependencies": {

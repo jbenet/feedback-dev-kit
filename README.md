@@ -19,6 +19,25 @@ Two packages:
 
 There is no Title field: titles are generated from the body and screenshots on the server.
 
+## Next.js is not required
+
+Neither package depends on Next.js. What each one needs:
+
+- **The client** needs React 19 and a browser. It works in any React app: Vite, Create React App,
+  Remix or React Router, Next.js (App or Pages Router), or a plain SPA. Give `FeedbackProvider` the
+  current path from whatever router you use, and the issues pages your router's `Link` if you want
+  client-side navigation (plain `<a>` links otherwise).
+- **The server** needs Node 20 or later, because the journal writes to disk. Its handler takes a
+  fetch `Request` and returns a `Response`, so it mounts in anything that speaks that or `node:http`:
+  plain Node, Express, Connect, Hono on Node, or Next.js route handlers. The `…/next` and
+  `…/node` exports are small adapters on top of it; neither pulls in a framework.
+- **Your backend does not have to be JavaScript.** The client only talks HTTP to `/api/feedback` and
+  `/api/issues` ([the wire contract](docs/REBUILD.md)). Run the kit's server as a small Node service
+  beside your app and proxy those two paths to it, or implement the contract yourself.
+
+Two examples show this: `examples/next-app` (Next.js App Router) and `examples/vite-app` (Vite and
+React with no router library, served by `node:http` with no framework).
+
 ## Tour
 
 The feedback panel, with the automatic screenshot of the page behind it:
@@ -47,17 +66,67 @@ The issues page: counts by priority, velocity, filters and local search (`/`):
 
 More in [docs/FEATURES.md](docs/FEATURES.md).
 
-## Try the example
+## Try the examples
 
 `examples/next-app` is a small Next.js app (an invented bakery) wiring both packages, with end-to-end
-tests. From the repository root:
+tests. `examples/vite-app` is the same kit in a Vite + React app on plain Node, in about 150 lines.
+From the repository root:
 
 ```sh
 npm install
-npm run dev          # builds both packages, then http://localhost:3172: press Alt+F (Option+F on a Mac)
+npm run dev          # Next.js: builds both packages, then http://localhost:3172: press Alt+F (Option+F on a Mac)
+npm run dev:vite     # Vite + node:http, no framework: http://localhost:3173
 ```
 
-Pick a person under **Sign in as** in the rail to see the issues pages; filing works signed out too.
+In the Next.js example, pick a person under **Sign in as** in the rail to see the issues pages; filing
+works signed out too.
+
+## Quick start without Next.js (Vite, or any React app, on Node)
+
+The whole server is one handler mounted in front of your app. With `node:http`:
+
+```ts
+// server.ts
+import { createServer } from 'node:http';
+import { createFeedbackHandler, fileStore, startIngester } from '@jbenet/feedback-server';
+import { toNodeListener } from '@jbenet/feedback-server/node';
+
+const journal = '.data/inbox';
+const store = fileStore({ dir: '.data/issues' });
+startIngester({ journal, store });
+const feedback = createFeedbackHandler({
+  journal,
+  store,
+  resolveReporter: (req) => userFromRequest(req)?.handle ?? null,   // yours, from the session
+  authorize: (req) => Boolean(userFromRequest(req)),
+});
+createServer(toNodeListener(feedback, { fallback: yourApp })).listen(3000);
+
+// Or in Express, before your routes:
+// app.use((req, res, next) => toNodeListener(feedback, { fallback: () => next() })(req, res));
+```
+
+The client is the provider, the button and the stylesheet:
+
+```tsx
+import '@jbenet/feedback-react/styles.css';
+import { FeedbackButton, FeedbackProvider, FeedbackStatus, KeyboardShortcuts } from '@jbenet/feedback-react';
+
+export function App() {
+  const pathname = useLocation().pathname;   // from your router, or window.location.pathname
+  return (
+    <FeedbackProvider pathname={pathname}>
+      <nav>… <FeedbackStatus /> <FeedbackButton variant="rail" /></nav>
+      <main>…</main>
+      <KeyboardShortcuts />
+    </FeedbackProvider>
+  );
+}
+```
+
+Self-host the fonts and run `VIEWPORT_BOOT` before the first render, as
+[`examples/vite-app`](examples/vite-app) does, where the rest (dev server, production build, the
+issues pages) is wired up. The Next.js steps below cover the same pieces in more detail.
 
 ## Quick start (Next.js App Router)
 

@@ -38,7 +38,7 @@ optional.
 | Package | Version | Kind | Why |
 |---|---|---|---|
 | Node.js | ≥ 20 | runtime | `node:fs/promises` (`open` with `wx`, `FileHandle.sync`, `link`, `rename`), `node:crypto` (`randomBytes`, `timingSafeEqual`, `createHash`). The journal and the files store need nothing else. |
-| `next` | 16.3.5 in PL LabOS tools | optional peer | Route handler adapters and `instrumentation.ts` to start the ingester. A plain Node adapter is included for anything else. |
+| `next` | 16.3.5 in PL LabOS tools | not a dependency | `@jbenet/feedback-server/next` is a four-line wrapper that exports the handler as App Router route handlers; nothing imports `next`. The handler itself is a fetch `Request` → `Response` function, and `@jbenet/feedback-server/node` adapts it to `node:http`, Express or Connect (`examples/vite-app` uses that). |
 | `better-sqlite3` | ≥ 11 (13.0.3 in development) | optional peer | The SQLite store. |
 | `pg` | ≥ 8 (8.23.0 in development) | optional peer | The Postgres store. |
 | `@anthropic-ai/sdk` | ≥ 0.60 (0.129.0 in development) | optional peer | The AI title adapter. Any model can be used through the title hook instead. |
