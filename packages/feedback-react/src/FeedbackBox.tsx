@@ -19,21 +19,6 @@ import { currentLocation, themeStyle, useFeedbackConfig, type ResolvedFeedbackCo
 import { savedAt } from './time';
 import { useFocusTrap } from './useSheet';
 
-export type Kind = 'bug' | 'request' | 'question' | 'chore';
-export type Priority = 'P0' | 'P1' | 'P2' | 'P3';
-
-/**
- * What a priority *means*, not when it will be fixed. How fast anything gets fixed is a function
- * of how full the queue is, and a promise the queue cannot keep teaches people to file everything
- * as P0.
- */
-export const PRIORITY_MEANS: Record<Priority, string> = {
-  P0: 'Blocking — nobody can work around this',
-  P1: 'Serious — there is a workaround and it hurts',
-  P2: 'Normal — worth doing, not urgent',
-  P3: 'Someday — a good idea with no clock on it',
-};
-
 /** The outbox and the drafts read their names and URL from the provider, once per page. */
 function useConfiguredStorage(config: ResolvedFeedbackConfig) {
   configureOutbox({ submitUrl: config.endpoints.submit, prefix: config.storagePrefix });
@@ -109,7 +94,7 @@ interface Shot {
 /**
  * The box itself: a sheet from the right (the whole width on a phone). No title field — the
  * server writes the title from what was said. Screenshots first (one taken automatically), then
- * the words, kind and priority; ⌘/Ctrl+Enter files it, Esc closes it, and the draft is kept per
+ * the words; no kind or priority either (triage sets those). ⌘/Ctrl+Enter files it, Esc closes it, and the draft is kept per
  * page until it is filed.
  */
 export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
@@ -169,8 +154,6 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
   // so keys typed the moment the box opens are never lost to a rebuild.
   const [initial] = useState(() => readDraft(path));
   const [body, setBody] = useState(initial?.body ?? '');
-  const [kind, setKind] = useState<Kind>((initial?.kind as Kind | undefined) ?? 'bug');
-  const [priority, setPriority] = useState<Priority>((initial?.priority as Priority | undefined) ?? 'P2');
   /** 'saving' is the moment it goes into this browser's outbox; nothing here waits on the server. */
   const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -267,8 +250,6 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
     setImages([]);
     if (!first) {
       setBody(d?.body ?? '');
-      setKind((d?.kind as Kind | undefined) ?? 'bug');
-      setPriority((d?.priority as Priority | undefined) ?? 'P2');
       setGeneration((g) => g + 1);
     }
     const fill = (kept: { shots: Shot[]; images: DroppedImage[] } | null) => {
@@ -294,9 +275,9 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     if (hydrating.current || state === 'saved') return;
     writeDraft(draftPage, worthKeeping
-      ? { body, kind, priority, at: new Date().toISOString(), pictures: shots.length + images.length }
+      ? { body, at: new Date().toISOString(), pictures: shots.length + images.length }
       : null);
-  }, [body, kind, priority, shots, images, draftPage, state, worthKeeping]);
+  }, [body, shots, images, draftPage, state, worthKeeping]);
   // Pictures change rarely — taken, drawn on, removed — so each change is written as it happens.
   useEffect(() => {
     if (hydrating.current || state === 'saved') return;
@@ -376,7 +357,7 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
     setState('saved');
     try {
       await enqueue({
-        body: packed.body, kind, priority, page: path, context,
+        body: packed.body, page: path, context,
         screenshots: shots.map((x) => x.dataUrl),
         images: packed.images.map((i) => ({ name: i.name, dataUrl: i.dataUrl })),
         // The server numbers attachments with the screenshots first, so a body written against
@@ -607,26 +588,6 @@ export function FeedbackDrawer({ onClose }: { onClose: () => void }) {
                   + 'Markdown works. Drop or paste a screenshot from somewhere else in here.'
                 }
               />
-            </div>
-
-            <div className="fieldrow">
-              <label className="field">
-                <span className="lbl">Kind</span>
-                <select value={kind} onChange={(e) => setKind(e.target.value as Kind)}>
-                  <option value="bug">bug</option>
-                  <option value="request">request</option>
-                  <option value="question">question</option>
-                  <option value="chore">chore</option>
-                </select>
-              </label>
-              <label className="field">
-                <span className="lbl">Priority</span>
-                <select value={priority} onChange={(e) => setPriority(e.target.value as Priority)}>
-                  {(Object.keys(PRIORITY_MEANS) as Priority[]).map((p) => (
-                    <option key={p} value={p}>{p} — {PRIORITY_MEANS[p]}</option>
-                  ))}
-                </select>
-              </label>
             </div>
 
             {state === 'failed' && (

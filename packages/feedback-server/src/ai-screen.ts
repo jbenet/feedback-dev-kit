@@ -57,7 +57,7 @@ export function anthropicScreen(options: AnthropicScreenOptions = {}): ScreenRep
     }));
     content.push({
       type: 'text',
-      text: `Page: ${input.page}\nKind: ${input.kind}\n${pictures.length ? `The ${pictures.length} image(s) are the report's pictures.\n` : ''}\n<report>\n${input.body.slice(0, 20_000)}\n</report>\n\nVerdict:`,
+      text: `Page: ${input.page}\n${input.kind ? `Kind: ${input.kind}\n` : ''}${pictures.length ? `The ${pictures.length} image(s) are the report's pictures.\n` : ''}\n<report>\n${input.body.slice(0, 20_000)}\n</report>\n\nVerdict:`,
     });
     const res = await c.messages.create({ model, max_tokens: 100, system: SYSTEM, messages: [{ role: 'user', content }] }, { signal });
     // A model that refuses to look at a report has found something worth a person's eyes.

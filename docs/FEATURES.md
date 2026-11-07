@@ -17,7 +17,7 @@ Contents:
 4. [More screenshots: whole page and pick a part](#4-more-screenshots-whole-page-and-pick-a-part)
 5. [Annotating a screenshot](#5-annotating-a-screenshot)
 6. [The description field](#6-the-description-field)
-7. [Kind and priority](#7-kind-and-priority)
+7. [Kind and priority, set downstream](#7-kind-and-priority-set-downstream)
 8. [Drafts](#8-drafts)
 9. [Filing: journaled on the server, outbox in the browser](#9-filing-journaled-on-the-server-outbox-in-the-browser)
 10. [The status mark](#10-the-status-mark)
@@ -62,7 +62,6 @@ full width. From top to bottom:
   saves it on the server at once, or keeps it in the browser if the server cannot be reached.
 - **Screenshots** ([3](#3-the-automatic-screenshot), [4](#4-more-screenshots-whole-page-and-pick-a-part)).
 - **Enter any feedback:**, the description field ([6](#6-the-description-field)).
-- **Kind** and **Priority** ([7](#7-kind-and-priority)).
 - **File it** and **Cancel**, a one-line key hint (`⌘↵ file · esc close · tab next field · ? all
   shortcuts`), and a folded **Captured with it** section ([12](#12-what-is-captured-with-a-report)).
 
@@ -210,20 +209,24 @@ The description is a WYSIWYG markdown editor (TipTap with `tiptap-markdown`):
 - While images are being read, a "Reading images…" line shows and **File it** waits.
 - `<`, `>` and `&` are stored as typed, not as HTML entities.
 
-## 7. Kind and priority
+## 7. Kind and priority, set downstream
 
-Both optional, with PL LabOS tools' defaults.
+The box asks for neither. Reporters left them at bug/P2 almost every time, so they carried no
+information and cost two fields.
 
-- **Kind:** bug (default), request, question, chore.
-- **Priority:** P0 Blocking (nobody can work around this), P1 Serious (there is a workaround and it
-  hurts), P2 Normal (default; worth doing, not urgent), P3 Someday (a good idea with no clock on it).
-  Each meaning is spelled out right in the priority dropdown's own options, so it travels with the
-  choice instead of sitting in a paragraph underneath. No date is promised against a priority: how
-  fast anything is fixed depends on how full the queue is, which the issues page shows. (An earlier
-  version promised "fixed in 1–2 days" for P0, which taught people to file everything as P0.)
+- **Kind** (bug, request, question, chore) is read from the words when the server titles the report
+  with a model: the same call answers with the kind on a line before the title. Only an exact one of
+  the four words is used; anything else, no model configured, or a report flagged as a possible prompt
+  injection (which never reaches the model) files as bug. A report can at most steer its own kind label,
+  never its priority, status or anything else. A sender that names a kind (an agent over the API or
+  MCP) keeps it.
+- **Priority** is never inferred: everything arrives as P2 and triage sets it ([TRIAGE.md](TRIAGE.md)).
+  Letting a report's own words set its priority is exactly the lever an injected report would want.
+  P0 Blocking, P1 Serious (a workaround that hurts), P2 Normal, P3 Someday. No date is promised
+  against a priority: how fast anything is fixed depends on how full the queue is.
 
-In practice almost every report arrives as bug/P2. Triage should not rely on them
-([TRIAGE.md](TRIAGE.md)).
+Both stay on the issue as triage fields: the issues page filters and shows them, the GitHub store
+keeps them as `kind:*` and `priority:*` labels, and triage changes them with PATCH or MCP.
 
 ## 8. Drafts
 
@@ -233,7 +236,7 @@ Nothing typed is lost to a reload, a crash or a closed tab.
 
 - A draft is **per page**: it is named by the route it was started on. Opening the panel on a page
   with a draft restores it, with a line saying it is your unsent draft for this page and since when.
-- Words (body, kind, priority) are saved to localStorage on every change. Pictures (screenshots,
+- Words are saved to localStorage on every change. Pictures (screenshots,
   annotated or not, and dropped images) are saved to IndexedDB under the same page, because two or
   three of them exceed what localStorage holds.
 - A draft exists only when there is something worth keeping: words, an annotated screenshot or a
@@ -286,7 +289,7 @@ The outbox list shows each waiting report with its first line, when it was writt
 picture count, its state ("Could not reach the server · 1 try · next in 4 s") and three actions:
 
 - **Retry now** sends it immediately, even one the server refused.
-- **Copy text** copies the title line, body, kind, priority, page and time, enough to file it by
+- **Copy text** copies the title line, body, page and time, enough to file it by
   hand if everything else fails. It works on plain http too (falls back to a selection copy).
 - **Discard** drops it after a confirmation.
 

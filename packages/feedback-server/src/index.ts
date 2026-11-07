@@ -9,7 +9,7 @@ export {
   createIngester, startIngester, ingesterFor, stopIngesters, defaultBackoff,
   type Ingester, type IngesterOptions, type IngestResult, type Reporter,
 } from './ingest.ts';
-export { anthropicTitle, defaultGenerateTitle, DEFAULT_TITLE_MODEL, type GenerateTitle, type TitleInput, type AnthropicTitleOptions, type MessagesClient } from './ai-title.ts';
+export { anthropicTitle, defaultGenerateTitle, DEFAULT_TITLE_MODEL, splitKind, type GenerateTitle, type TitleInput, type TitleResult, type AnthropicTitleOptions, type MessagesClient } from './ai-title.ts';
 export { fileStore, type FileStore, type FileStoreOptions } from './stores/files.ts';
 export { parseIssue, serializeIssue, slugify, type ParsedIssue } from './stores/format.ts';
 export { sqlStore, migrate, MIGRATIONS, pgDriver, sqliteDriver, type SqlStoreOptions, type SqlDriver, type Migration } from './stores/sql.ts';

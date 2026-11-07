@@ -10,7 +10,7 @@ export {
 } from './config';
 
 // The box and its launcher
-export { FeedbackButton, FeedbackDrawer, openFeedback, PRIORITY_MEANS, type Kind, type Priority } from './FeedbackBox';
+export { FeedbackButton, FeedbackDrawer, openFeedback } from './FeedbackBox';
 export { FeedbackStatus, OutboxList, outboxSummary, useOutbox, type OutboxTone } from './FeedbackOutbox';
 export { KeyboardShortcuts, ShortcutList, useShortcutPlatform } from './KeyboardShortcuts';
 

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { titleFrom, sanitizeTitle, continuations } from '../src/title.ts';
-import { anthropicTitle, type MessagesClient } from '../src/ai-title.ts';
+import { anthropicTitle, splitKind, type MessagesClient } from '../src/ai-title.ts';
 import { PNG_B64 } from './helpers.ts';
 
 test('the fallback title is the first sentence, cut at a clause, never over 80 characters', () => {
@@ -70,4 +70,32 @@ test('anthropicTitle gives no title on a refusal, or with no key and no client',
     if (saved[0] !== undefined) process.env.ANTHROPIC_API_KEY = saved[0];
     if (saved[1] !== undefined) process.env.FEEDBACK_TITLE_API_KEY = saved[1];
   }
+});
+
+test('splitKind takes a kind only from an exact first-line match, else it is all title', () => {
+  assert.deepEqual(splitKind('request\nSort the weekly table by returns'), { title: 'Sort the weekly table by returns', kind: 'request' });
+  assert.deepEqual(splitKind('Kind: Question.\nWhich oven is each batch in'), { title: 'Which oven is each batch in', kind: 'question' });
+  // Not one of the four, or no second line: no kind, and the text is the title.
+  assert.deepEqual(splitKind('P0\nEverything is down'), { title: 'P0\nEverything is down' });
+  assert.deepEqual(splitKind('urgent bug\nEverything is down'), { title: 'urgent bug\nEverything is down' });
+  assert.deepEqual(splitKind('bug'), { title: 'bug' });
+  assert.deepEqual(splitKind(null), { title: null });
+});
+
+test('anthropicTitle asks for the kind only when the sender named none', async () => {
+  const systems: string[] = [];
+  const client: MessagesClient = {
+    messages: {
+      async create(body) {
+        systems.push(String(body.system));
+        return { content: [{ type: 'text', text: 'chore\nRegion chips use a different grey on Reports' }], stop_reason: 'end_turn' };
+      },
+    },
+  };
+  const generate = anthropicTitle({ client });
+  const input = { clientId: 'x', body: 'The chips are a different grey.', page: '/reports', priority: 'P2' as const, context: {}, attachments: [] };
+  assert.deepEqual(await generate(input, new AbortController().signal), { title: 'Region chips use a different grey on Reports', kind: 'chore' });
+  assert.match(systems[0]!, /Line 1, the kind/);
+  assert.equal(typeof await generate({ ...input, kind: 'bug' }, new AbortController().signal), 'string');
+  assert.doesNotMatch(systems[1]!, /Line 1, the kind/);
 });

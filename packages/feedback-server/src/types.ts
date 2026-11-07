@@ -23,6 +23,7 @@ export interface FeedbackWireRequest {
   title?: string;
   /** Markdown. Images dropped into it are written `![name](attachment:N)`. */
   body?: string;
+  /** Optional, and the box sends neither: the kind is inferred from the words, triage sets the priority. */
   kind?: IssueKind;
   priority?: IssuePriority;
   /** The route the report was written on, e.g. `/orders`. */
@@ -52,7 +53,11 @@ export interface CheckedReport {
   /** What the sender typed as a title; '' when none (the usual case). */
   title: string;
   body: string;
-  kind: IssueKind;
+  /**
+   * Only when the sender named one (an agent through the API or MCP). The box sends none: the
+   * ingester infers it from the words when a model titles the report, else files it as a bug.
+   */
+  kind?: IssueKind;
   priority: IssuePriority;
   page: string;
   context: Record<string, unknown>;

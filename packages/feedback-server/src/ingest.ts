@@ -17,7 +17,7 @@ import { defaultGenerateTitle, type GenerateTitle } from './ai-title.ts';
 import { createJournal, type Journal } from './journal.ts';
 import { flagNote, neutralize, patternScreen, type ScreenInput, type ScreenReport, type ScreenVerdict } from './injection.ts';
 import { sanitizeTitle, titleFrom } from './title.ts';
-import { RefusedError, RetryLaterError, type FeedbackStore, type Issue, type IssueDraft, type JournalEntry } from './types.ts';
+import { KINDS, RefusedError, RetryLaterError, type FeedbackStore, type Issue, type IssueDraft, type IssueKind, type JournalEntry } from './types.ts';
 
 export interface Reporter {
   handle: string;
@@ -97,7 +97,7 @@ export function createIngester(options: IngesterOptions): Ingester {
 
   const retry = new Map<string, { attempts: number; nextAt: number; lastError: string }>();
   /** A generated title, kept so a retry does not pay for (or change) it again. */
-  const titles = new Map<string, string>();
+  const titles = new Map<string, { title: string; kind?: IssueKind }>();
   const screened = new Map<string, ScreenVerdict>();
   const screen = options.screen ?? null;
   const onSuspicious = options.onSuspicious ?? 'flag';
@@ -108,22 +108,30 @@ export function createIngester(options: IngesterOptions): Ingester {
   let again = false;
   const timers: Array<ReturnType<typeof setInterval>> = [];
 
-  async function titleOf(entry: JournalEntry, draft: Omit<IssueDraft, 'title'>, flagged: boolean): Promise<string> {
+  /**
+   * The title, and the kind the model read from the words when the sender named none. The kind is
+   * taken only if it is exactly one of KINDS: a report can steer it at most between those four labels.
+   */
+  async function titleOf(entry: JournalEntry, draft: Omit<IssueDraft, 'title' | 'kind'>, flagged: boolean): Promise<{ title: string; kind?: IssueKind }> {
     const given = neutralize(entry.request.title).text.trim();
-    if (given) return given;
+    if (given) return { title: given };
     const cached = titles.get(entry.clientId);
     if (cached) return cached;
     const bodyText = draft.body;
     let title = '';
+    let kind: IssueKind | undefined;
     // A flagged report is not handed to a model: the first sentence names it.
     if (generate && !flagged) {
       const ac = new AbortController();
       const timer = setTimeout(() => ac.abort(), titleTimeout);
       try {
-        title = sanitizeTitle(await generate({
+        const said = await generate({
           clientId: entry.clientId, body: bodyText, page: entry.request.page, kind: entry.request.kind,
           priority: entry.request.priority, context: entry.request.context, attachments: draft.attachments ?? [],
-        }, ac.signal));
+        }, ac.signal);
+        const res = typeof said === 'object' && said ? said : { title: said };
+        title = sanitizeTitle(res.title);
+        if (!entry.request.kind && (KINDS as readonly string[]).includes(res.kind ?? '')) kind = res.kind as IssueKind;
       } catch (err) {
         log.warn(`[feedback] title generation failed for ${entry.clientId}; using the first sentence: ${err instanceof Error ? err.message : String(err)}`);
       } finally {
@@ -132,8 +140,9 @@ export function createIngester(options: IngesterOptions): Ingester {
     }
     // The first sentence; else the first line with a letter in it (an image's name, say); else "Untitled".
     title ||= titleFrom(bodyText) || sanitizeTitle(bodyText.replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')) || 'Untitled';
-    titles.set(entry.clientId, title);
-    return title;
+    const named = { title, ...(kind ? { kind } : {}) };
+    titles.set(entry.clientId, named);
+    return named;
   }
 
   async function reporterOf(entry: JournalEntry): Promise<Reporter> {
@@ -183,9 +192,9 @@ export function createIngester(options: IngesterOptions): Ingester {
     if (verdict.action === 'refuse') throw new RefusedError(`Refused as a possible prompt injection: ${verdict.reasons.join('; ')}`);
     const flagged = verdict.action === 'flag';
     const body = cleaned.text || '(no description given)';
-    const base: Omit<IssueDraft, 'title'> = {
+    const base: Omit<IssueDraft, 'title' | 'kind'> = {
       body: flagged ? `${flagNote(verdict.reasons)}\n${body}` : body,
-      kind: r.kind, priority: r.priority, reporter: reporter.handle, page: r.page,
+      priority: r.priority, reporter: reporter.handle, page: r.page,
       labels: flagged ? [suspiciousLabel] : [],
       context: {
         ...context,
@@ -193,7 +202,9 @@ export function createIngester(options: IngesterOptions): Ingester {
       },
       attachments, tokenOffset: r.imageOffset, clientId: entry.clientId, receivedAt: entry.receivedAt,
     };
-    return store.create({ ...base, title: await titleOf(entry, { ...base, body }, flagged) });
+    const named = await titleOf(entry, { ...base, body }, flagged);
+    // The sender's kind if it named one (the API, MCP), else what the model read, else bug until triage.
+    return store.create({ ...base, kind: r.kind ?? named.kind ?? 'bug', title: named.title });
   }
 
   async function pass(): Promise<IngestResult> {
