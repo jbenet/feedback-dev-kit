@@ -22,8 +22,6 @@ export function wire(overrides: Record<string, unknown> = {}): Record<string, un
   return {
     clientId: id(),
     body: 'The totals row on the invented orders page counts returns twice.',
-    kind: 'bug',
-    priority: 'P2',
     page: '/orders',
     context: {
       route: '/orders', url: 'http://app.test/orders?state=late', filters: { state: 'late' },

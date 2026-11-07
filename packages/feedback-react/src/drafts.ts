@@ -1,6 +1,6 @@
 /**
  * Unsent feedback, kept in this browser through reloads. A draft is named by the page it was
- * started on. Its words — text, kind, priority — go to localStorage, one key per draft,
+ * started on. Its words go to localStorage, one key per draft,
  * `<prefix>.feedback.draft:<page>`. Its pictures — the screenshots, drawn on or not, and any image
  * dropped into the text — go to IndexedDB under the same page, because two or three of them are more
  * than localStorage holds. Nothing here leaves the browser until the report is filed.
@@ -17,8 +17,6 @@ const draftKey = () => `${prefix}.feedback.draft:`;
 
 export interface DraftWords {
   body: string;
-  kind?: string;
-  priority?: string;
   /** When it was last saved. */
   at?: string;
   /** How many pictures were kept with it, in IndexedDB. */
@@ -43,7 +41,7 @@ export function readDraft(page: string): DraftWords | null {
     const raw = window.localStorage.getItem(draftKey() + page);
     if (!raw) return null;
     const d = JSON.parse(raw) as DraftWords;
-    return typeof d === 'object' && d ? { body: d.body ?? '', kind: d.kind, priority: d.priority, at: d.at, pictures: d.pictures ?? 0 } : null;
+    return typeof d === 'object' && d ? { body: d.body ?? '', at: d.at, pictures: d.pictures ?? 0 } : null;
   } catch { return null; }
 }
 

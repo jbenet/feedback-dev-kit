@@ -4,6 +4,14 @@ Both packages share one version.
 
 ## Unreleased
 
+- **No Kind or Priority in the box** (7 Nov 2026): reporters left them at bug/P2, so the fields are
+  gone. The server infers the kind from the words in the same model call that writes the title (one
+  of the four words or nothing; flagged reports are never sent, and file as bug), and every report
+  arrives as P2 for triage to set. Both stay as triage fields on issues, labels, the issues page,
+  PATCH and MCP. The API and MCP still accept them. Breaking: `PRIORITY_MEANS`, `Kind` and `Priority`
+  are no longer exported from `@jbenet/feedback-react` (use `PRIORITY`, `IssueKind`, `IssuePriority`);
+  `CheckedReport.kind` and `TitleInput.kind` are optional; a `GenerateTitle` may return
+  `{ title, kind }`.
 - **Who gets a fix, and a red-team pass** (7 Nov 2026): the ingester stamps every issue
   `trust:implement` or `trust:triage` from a new `policy` option (default: signed-in reporters
   implement; no session, an unresolved user or another app over MCP, triage; a flagged report always
@@ -16,7 +24,6 @@ Both packages share one version.
   labels people change on GitHub, and shows the reporter as code (no @mentions). A filing that landed
   between a worker's long-poll read and its listen was missed until the timeout; it no longer is. The
   README has a security section: surface, threat model, the submitter policy and what is sandboxed.
-
 - **Annotator keys** (31 Oct 2026): **Return** on a pending crop cuts the picture down to it in the
   editor, there and then (undo puts the rest back), and **⌘/Ctrl+Return** is Done from anywhere in the
   editor, a label being typed included. Plain Return never finishes, so it can't close the editor by

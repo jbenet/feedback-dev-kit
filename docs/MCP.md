@@ -55,8 +55,8 @@ File a report. Annotations: not read-only, not destructive, idempotent (by `clie
 | Argument | Type | | Meaning |
 |---|---|---|---|
 | `body` | string | required | The report in markdown: what you expected, what happened, how to reproduce it. |
-| `kind` | `bug` \| `request` \| `question` \| `chore` | default `bug` | |
-| `priority` | `P0` \| `P1` \| `P2` \| `P3` | default `P2` | P0 blocking, P1 serious with a workaround, P2 normal, P3 someday. |
+| `kind` | `bug` \| `request` \| `question` \| `chore` | optional | Left out, it is read from the body when a title model is configured, else `bug`. |
+| `priority` | `P0` \| `P1` \| `P2` \| `P3` | default `P2` | P0 blocking, P1 serious with a workaround, P2 normal, P3 someday. Triage may change it. |
 | `about` | string | default `/` | What in the receiving app it is about: a tool name (`tool:invoices.list`), an endpoint (`GET /api/rates`), a page or route. |
 | `title` | string | optional | One line. Without one, the receiving app writes it from the body. |
 | `context` | object | optional | Plain data that helps reproduce it: request ids, versions, inputs. No secrets. |

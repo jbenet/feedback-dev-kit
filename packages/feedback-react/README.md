@@ -189,7 +189,9 @@ as a worked example of the shape a `theme` object takes.
 - The status mark is a line in words that opens the outbox list directly (no popover in between).
 - No intro prose: the panel's heading is just "Feedback", the description field is labelled "Enter
   any feedback:", and the screenshot buttons' explanation lives in a `(?)` tooltip instead of a
-  paragraph. The priority dropdown's own options carry what each priority means.
+  paragraph.
+- No Kind or Priority fields: reporters left them at bug/P2. The server infers the kind from the
+  words when it titles the report, and triage sets the priority.
 - The default theme is PLC green, not PL LabOS tools' clay; the description field also gets a visible
   focus ring in the theme's accent colour.
 - PL LabOS tools' "filed from the live app" notice for development servers and its connection notes

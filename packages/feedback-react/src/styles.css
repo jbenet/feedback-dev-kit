@@ -124,7 +124,6 @@
 .fbk input[type=text],.fbk textarea,.fbk select{width:100%;font-family:inherit;font-size:13px;color:var(--fbk-ink);background:var(--fbk-surface);border:1px solid var(--fbk-line);border-radius:7px;padding:8px 10px}
 .fbk textarea{min-height:110px;resize:vertical;line-height:1.5}
 .fbk input:focus,.fbk textarea:focus,.fbk select:focus{outline:2px solid #E0CDBF;outline-offset:1px}
-.fbk .fieldrow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 /* feedback drawer */
 .fbk .scrim{position:fixed;inset:0;background:rgba(26,25,23,.28);z-index:40}
 .fbk .drawer{position:fixed;top:0;right:0;bottom:0;width:420px;background:var(--fbk-surface);border-left:1px solid var(--fbk-line);z-index:41;padding:20px 22px;overflow-y:auto;box-shadow:-18px 0 40px rgba(26,25,23,.12)}
@@ -464,7 +463,6 @@ body:has(.shortcuts-dialog[open]) .fbk .feedbackkey{display:inline}
     padding-right:calc(16px + env(safe-area-inset-right))}
   .fbk .drawer.wide{width:100%}
   .fbk .drawer.wide .fbcols{display:block}
-  .fbk .fieldrow{grid-template-columns:1fr}
   .fbk .keycard,.fbk .keycard.overdrawer{right:8px;left:8px;width:auto;top:12px;z-index:96}
 }
 @media (prefers-reduced-motion: reduce){ .fbk .drawer{transition:none} }

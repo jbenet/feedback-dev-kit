@@ -77,7 +77,8 @@ export interface ScreenInput {
   clientId: string;
   body: string;
   page: string;
-  kind: IssueKind;
+  /** Only when the sender named one. */
+  kind?: IssueKind;
   context: Record<string, unknown>;
   /** The report's pictures, screenshots first. */
   attachments: IssueAttachment[];

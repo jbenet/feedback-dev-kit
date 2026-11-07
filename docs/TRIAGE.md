@@ -118,8 +118,9 @@ why: Moves Approvals below Calendar, which reverses the navigation order decided
   (21 entries, repo sources only)", not "no contradiction". Unsupported is not nonexistent.
 - Any route to the owner carries the quoted decision, so the answer can be one line.
 
-Do not trust `kind` and `priority` from the box: almost every report arrives as bug/P2. Triage sets
-them.
+The box asks for neither `kind` nor `priority`. A report arrives with the kind a model read from its
+words (bug when no model is configured, or when it was flagged) and always as P2. Check the kind and
+set the priority.
 
 ## 5. Statuses, and "mark fixed issues done"
 

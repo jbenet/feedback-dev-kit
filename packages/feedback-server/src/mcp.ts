@@ -125,8 +125,8 @@ export function feedbackTools(options: Omit<FeedbackMcpOptions, 'identify' | 'al
       type: 'object',
       properties: {
         body: { type: 'string', description: 'The report, in markdown: what you expected, what happened, how to reproduce it.', minLength: 1, maxLength: limits.maxBodyChars },
-        kind: { type: 'string', enum: [...KINDS], description: 'bug (something is wrong), request (something is missing), question, or chore. Default bug.' },
-        priority: { type: 'string', enum: [...PRIORITIES], description: 'P0 blocking, P1 serious with a workaround, P2 normal (default), P3 someday.' },
+        kind: { type: 'string', enum: [...KINDS], description: 'bug (something is wrong), request (something is missing), question, or chore. Leave it out to have it read from the words (bug when no model is configured).' },
+        priority: { type: 'string', enum: [...PRIORITIES], description: 'P0 blocking, P1 serious with a workaround, P2 normal (default), P3 someday. Triage may change it.' },
         about: { type: 'string', description: 'What in this app it is about: a tool name, an endpoint, a page or route. Default "/".', maxLength: 2000 },
         title: { type: 'string', description: 'Optional one-line title. Without one, the app writes it from the body.', maxLength: limits.maxTitleChars },
         context: { type: 'object', description: 'Optional plain data that helps reproduce it: request ids, versions, inputs (no secrets).', additionalProperties: true },

@@ -87,7 +87,8 @@ export function scrubSecrets(context: Record<string, unknown>): void {
 
 /**
  * A report as the box sends it, checked: words (a title or a body), only the four image types
- * (screenshots PNG only), sizes capped. Odd kinds and priorities fall back to bug and P2.
+ * (screenshots PNG only), sizes capped. A missing or odd kind is left out (the ingester infers it);
+ * a missing or odd priority is P2.
  */
 export function checkReport(raw: unknown, limits: Limits = DEFAULT_LIMITS): Checked<CheckedReport> {
   const b = (raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}) as Record<string, unknown>;
@@ -154,11 +155,11 @@ export function checkReport(raw: unknown, limits: Limits = DEFAULT_LIMITS): Chec
     return { ok: false, status: 413, error: 'The captured page context is too large.' };
   }
 
-  const kind = (KINDS as readonly string[]).includes(str(b.kind)) ? str(b.kind) as IssueKind : 'bug';
+  const kind = (KINDS as readonly string[]).includes(str(b.kind)) ? str(b.kind) as IssueKind : undefined;
   const priority = (PRIORITIES as readonly string[]).includes(str(b.priority)) ? str(b.priority) as IssuePriority : 'P2';
   const page = str(b.page).replace(/[\r\n]+/g, ' ').trim().slice(0, 2_000) || '/';
   const imageOffset = Number.isInteger(b.imageOffset) && (b.imageOffset as number) >= 0 && (b.imageOffset as number) <= listed.length
     ? b.imageOffset as number : 0;
 
-  return { ok: true, value: { title, body, kind, priority, page, context, attachments, imageOffset } };
+  return { ok: true, value: { title, body, ...(kind ? { kind } : {}), priority, page, context, attachments, imageOffset } };
 }

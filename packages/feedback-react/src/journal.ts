@@ -15,8 +15,9 @@
 export interface FeedbackRequest {
   /** Markdown. Pictures dropped into it are `![name](attachment:N)` references. */
   body: string;
-  kind: string;
-  priority: string;
+  /** Not sent by the box: the server infers the kind and triage sets the priority. Older entries carry them. */
+  kind?: string;
+  priority?: string;
   page: string;
   /** route, url, filters, client {userAgent, viewport, pixelRatio, touch}, and anything the app adds. */
   context: Record<string, unknown>;
@@ -147,5 +148,5 @@ export const entryPictures = (entry: JournalEntry) => entry.request.screenshots.
 /** What "Copy text" copies: enough to file it by hand if everything else fails. */
 export function entryText(entry: JournalEntry): string {
   const r = entry.request;
-  return [r.body.trim(), '', `${r.kind} · ${r.priority} · ${r.page} · written ${entry.createdAt}`].join('\n');
+  return [r.body.trim(), '', [r.kind, r.priority, r.page, `written ${entry.createdAt}`].filter(Boolean).join(' · ')].join('\n');
 }

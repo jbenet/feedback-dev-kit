@@ -52,8 +52,6 @@ Request (JSON; see [REBUILD.md §2.1](REBUILD.md#21-post-baseapifeedback) for ev
 {
   "clientId": "3f0a2c9e-6b1d-4b8e-9d2e-0c1f5a7b8e21",
   "body": "The Late tile counts an order that is still proofing.\n\n![late-tile.png](attachment:1)",
-  "kind": "bug",
-  "priority": "P2",
   "page": "/orders",
   "context": {
     "route": "/orders", "url": "https://app.example/orders?state=late",
@@ -96,7 +94,8 @@ because it names a file.
   else, and no SVG (it can carry script).
 - Per picture at most 12,000,000 base64 characters (~9 MB); all pictures together at most 40,000,000
   (~30 MB, GUESS).
-- `kind` and `priority` outside their sets fall back to `bug` and `P2`; `page` defaults to `/`;
+- `kind` and `priority` are optional and the box sends neither. A missing or unknown `kind` is left
+  for the ingester to infer (§6), filed as `bug` when it can't; a missing or unknown `priority` is `P2`; `page` defaults to `/`;
   `context` must be an object; `imageOffset` a non-negative integer no larger than the attachment count.
 - A backslash at the end of a line is removed (a typed newline in a terminal, not text).
 
@@ -268,7 +267,10 @@ A loop in the same process as the web server (in Next.js, started from `instrume
 The client never asks for a title. The ingester makes one:
 
 1. **An LLM title** when a model is configured (a host hook; the package has an optional Anthropic
-   adapter). Input: the body, the page, the kind, and the screenshots as images. Ask for one plain
+   adapter). Input: the body, the page, the kind if the sender named one, and the screenshots as
+   images. When no kind was named the same call also answers with one (`bug`, `request`, `question`
+   or `chore`) on a line before the title; only an exact match is used, else `bug`. A report flagged
+   as a possible prompt injection is never sent, so it files as `bug`. Priority is never inferred. Ask for one plain
    sentence fragment under 80 characters that names what is wrong, not "Bug report"; no trailing full
    stop, no quotes, no invented detail. Time-box it (GUESS: 15 s) and treat any failure as "no title".
    The title is generated once, at filing, and stored; it is not regenerated when the body is edited.
@@ -499,7 +501,7 @@ Every issue gets the base label (`feedback` by default) plus:
 
 | Field | Label | Notes |
 |---|---|---|
-| kind | `kind:bug`, `kind:request`, `kind:question`, `kind:chore` | set at creation |
+| kind | `kind:bug`, `kind:request`, `kind:question`, `kind:chore` | set at creation (inferred, §6), replaced on change |
 | priority | `priority:P0` … `priority:P3` | replaced on change |
 | status | `status:open`, `status:triaged`, `status:agent-ready`, `status:in-progress` | `done` closes the issue with `state_reason: completed` |
 
