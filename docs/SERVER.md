@@ -150,8 +150,8 @@ The same token reads and updates issues (`/api/issues…`, their attachments, `P
 or an Origin, with or without `worker`. It is how an app's dev agents get at its feedback, so set it
 whenever `authorize` locks issues to signed-in users; the handler logs a hint at startup until you do.
 
-- `GET {base}/worker?id=<worker id>` checks in and answers `{ retire, startedAt, cursor, issues }`:
-  every `open` issue, oldest first. 409 `{ holder, seenAt }` when another live worker holds the queue.
+- `GET {base}/worker?id=<worker id>` checks in and answers `{ retire, startedAt, cursor, issues, held }`:
+  every `open` issue not flagged `suspicious`, oldest first, and how many flagged ones were `held`. 409 `{ holder, seenAt }` when another live worker holds the queue.
 - `&wait=<seconds>&after=<cursor>` waits (at most 9 minutes) for a filing after the cursor of the last
   answer, then answers the same way.
 - `DELETE {base}/worker?id=…` releases the lease: `{ released: 'released' | 'handed-on' | 'not-holder' }`.
@@ -414,7 +414,13 @@ Rules:
   re-roots paths and refuses `..` and NUL.
 - **Rendering.** Render bodies to React elements, never raw HTML.
 - **Rate.** A per-user limit on POSTs (GUESS: 30 a minute) protects the disk; resends of a known client
-  id are free because they write nothing.
+  id are free because they write nothing. Signed-out senders are keyed by address (`clientAddress`, or
+  the proxy headers, which a client can forge) and also share one bucket (`anonymousPerMinute`, 60), so
+  forging addresses buys nothing.
+- **Who gets a fix.** The ingester stamps every issue `trust:implement` or `trust:triage` from the app's
+  `policy` (default: signed-in reporters implement, everyone else triage; a flagged report always
+  triage). Clearing `suspicious` or changing a `trust:` label needs `authorize(req, 'moderate')`; the
+  worker token never may. See [TRIAGE.md §3](TRIAGE.md#3-roles--outcomes).
 - **No secrets in reports.** The client captures the URL, query string and user agent: strip known
   secret parameters (`token`, `key`, `code`, `password`, …) from `context.url` and `context.filters`
   before journaling. Mark sensitive regions `nocapture` so the automatic screenshot leaves them out; the

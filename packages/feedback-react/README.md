@@ -1,6 +1,8 @@
 # @jbenet/feedback-react
 
-The client half of feedback-kit: the feedback box from PL LabOS tools, for any React 19 app.
+The client half of feedback-kit: the feedback box from PL LabOS tools, for any React 19 app. It does
+not use or need Next.js: the examples below use the App Router, and `examples/vite-app` shows a Vite
+SPA with no router library.
 
 - **A button and a shortcut.** `Alt+F` (Option+F on a Mac) anywhere outside text fields and dialogs.
 - **A sidebar** that opens straight into typing. No title field — the server writes the title.
@@ -54,6 +56,9 @@ import '@fontsource/ibm-plex-mono/400.css';   // and 500
 
 ## Use
 
+Shown with the Next.js App Router. Elsewhere, render the same components at your app's root and pass
+`pathname` from your router (or leave it out, and the kit reads `window.location`).
+
 ```tsx
 // app/layout.tsx
 import '@jbenet/feedback-react/styles.css';
@@ -96,7 +101,7 @@ import { IssuesPage, IssuePage } from '@jbenet/feedback-react';
 ```
 
 `examples/next-app` wires all of it, with the server package, and has end-to-end tests (Chromium and
-WebKit). `npm test` here runs the capture fallbacks with the browser stubbed; what cannot be tested
+WebKit). `examples/vite-app` wires the same in a Vite app on plain Node. `npm test` here runs the capture fallbacks with the browser stubbed; what cannot be tested
 headless is in [REBUILD.md §15](../../docs/REBUILD.md#15-what-cannot-be-tested-headless).
 
 ## Configuration — `<FeedbackProvider>`

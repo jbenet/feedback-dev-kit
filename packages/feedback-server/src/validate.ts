@@ -55,7 +55,7 @@ export type Checked<T> = { ok: true; value: T } | { ok: false; status: number; e
 const DATA_URL = /^data:(image\/(?:png|jpeg|gif|webp));base64,([A-Za-z0-9+/=]+)$/;
 
 /** Keys in the captured context that only the server may write. A client value is dropped. */
-const SERVER_CONTEXT_KEYS = ['reporter', 'reporterVerification', 'user', 'journaledAt', 'receivedAt'];
+const SERVER_CONTEXT_KEYS = ['reporter', 'reporterVerification', 'user', 'journaledAt', 'receivedAt', 'policy', 'screening', 'missingAttachments'];
 
 /** Query parameters and filter keys that carry credentials, not page state. */
 export const SECRET_PARAM = /^(?:.*[_-])?(?:token|access_token|id_token|key|api_key|apikey|code|password|passwd|secret|signature|sig|session|auth)$/i;

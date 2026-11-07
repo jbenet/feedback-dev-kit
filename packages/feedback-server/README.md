@@ -5,6 +5,10 @@ answers, a background ingester that files the reports, and three places to file 
 files plus SQLite or Postgres, or files plus GitHub Issues. TypeScript, Node 20 or later, no runtime
 dependencies. The database drivers and the Anthropic SDK are optional peer dependencies.
 
+It needs no web framework: `createFeedbackHandler` returns a function from a fetch `Request` to a
+`Response`. `@jbenet/feedback-server/node` mounts it on `node:http`, Express or Connect, and
+`@jbenet/feedback-server/next` exports it as Next.js route handlers.
+
 The design and the reasons behind it are in [docs/SERVER.md](../../docs/SERVER.md). This README covers
 the API and setup.
 
@@ -62,7 +66,8 @@ export async function register() {
 }
 ```
 
-With plain Node:
+With plain Node (or Express, Connect, Vite's dev server: anything that takes a `node:http` listener),
+the same `lib/feedback.ts` and no Next.js at all. `examples/vite-app/server.ts` is a complete one:
 
 ```ts
 import { createServer } from 'node:http';
@@ -71,6 +76,9 @@ createServer(toNodeListener(feedback, { fallback: yourApp })).listen(3000);
 startFeedbackIngester();
 ```
 
+Anything else that hands you a fetch `Request` (Hono on Node, Bun) can call `feedback.handle(request)` directly. The journal needs a
+real disk, so not an edge runtime.
+
 ## HTTP API
 
 | Route | What |
@@ -78,7 +86,7 @@ startFeedbackIngester();
 | `POST /api/feedback` | Journal a report. 202 `{ journaled: true, clientId, repeat, id? }` once it is on disk. |
 | `GET /api/feedback?clientId=…` | `{ state: 'journaled' }`, `{ state: 'filed', id, location }`, `{ state: 'refused', error }`, or 404 `{ state: 'unknown' }`. Reads the journal only. |
 | `GET /api/feedback/export?since=<ISO with zone>` | `{ items: Issue[] }` created after `since`. `Authorization: Bearer $FEEDBACK_EXPORT_TOKEN`; 404 when unset, 401 when wrong, 400 for a bad `since`. |
-| `GET /api/feedback/worker?id=…[&wait=&after=]` | The one agent working the queue checks in (and long-polls): `{ retire, startedAt, cursor, issues }` of open issues, or 409 when another holds it. `DELETE` releases. `Authorization: Bearer $FEEDBACK_WORKER_TOKEN`, which also reads and updates issues (with or without `worker`); the endpoint is 404 without `worker` or a token. See [One worker at a time](#one-worker-at-a-time). |
+| `GET /api/feedback/worker?id=…[&wait=&after=]` | The one agent working the queue checks in (and long-polls): `{ retire, startedAt, cursor, issues, held }` of open issues (flagged ones held back for a person), or 409 when another holds it. `DELETE` releases. `Authorization: Bearer $FEEDBACK_WORKER_TOKEN`, which also reads and updates issues (with or without `worker`); the endpoint is 404 without `worker` or a token. See [One worker at a time](#one-worker-at-a-time). |
 | `GET /api/issues` | `{ issues: Issue[], destination, store }`, newest first. Optional `status`, `kind`, `priority` (comma lists), `q`. |
 | `GET /api/issues/:id` | `{ issue }` or 404. |
 | `PATCH /api/issues/:id` | `{ status?, priority?, kind?, labels? }` → `{ issue }`. Same-origin only. Records `closed_at` on done and clears it on reopen. |
@@ -116,11 +124,13 @@ The server also accepts `client_id`, an optional `title` (from agents filing thr
 | `resolveReporter(req)` | none | Returns the reporter's handle or id from your session (a cookie, a header your auth proxy sets; nothing that waits on a database). **Supply it**: without it every issue is filed as `unknown`. A throw counts as null, so a report is never lost to a session lookup. |
 | `origin` | same origin | `{ allowed: ['https://app.example'], allowMissing }`, or `false` for non-browser clients behind other auth. Compares against the `Host` header. `X-Forwarded-Host` is never trusted. |
 | `limits` | see `DEFAULT_LIMITS` | 48 MB request, 12 M base64 characters per picture, 40 M for all pictures, 20 pictures, 60,000 body characters, 64 KB context. Every value is a GUESS. |
-| `rateLimit` | `{ perMinute: 30 }` | New reports per reporter, in memory. Anonymous senders are keyed by `x-real-ip` / `x-forwarded-for`, which a client can set, so put a real limit in your proxy. |
+| `rateLimit` | `{ perMinute: 30, anonymousPerMinute: 60 }` | New reports per reporter, in memory. Signed-out senders are keyed by address, and also share one `anonymousPerMinute` bucket, so a forged `x-forwarded-for` buys no fresh limit. Still put a real limit in your proxy. |
+| `clientAddress(req)` | `x-real-ip`, then `x-forwarded-for` | The signed-out sender's address for the per-address limit. Those headers are only true behind a proxy you run that overwrites them; otherwise return the address your server saw. |
 | `accept` | `true` | `false` (or a function) answers 403 with `refusalMessage`. Use this on every server that must not file: only one server may hand out numbers. |
 | `exportToken` | `$FEEDBACK_EXPORT_TOKEN` | |
-| `authorize(req, action)` | allow all | `action` is `'read'`, `'update'` or `'attachment'`. Return true, false (403) or your own Response (a 401, say). Issues can hold anything a reporter saw: **supply this**, as you supply `resolveReporter`, or every issue and picture is readable by anyone who can reach the server. The example's is a demo "sign in as" cookie, which is not authentication. |
+| `authorize(req, action)` | allow all | `action` is `'read'`, `'update'`, `'attachment'` or `'moderate'` (a label change that clears the `suspicious` flag or adds, removes or swaps a `trust:` label: give it to the product's owners only; the worker token never has it). Return true, false (403) or your own Response (a 401, say). Issues can hold anything a reporter saw: **supply this**, as you supply `resolveReporter`, or every issue and picture is readable by anyone who can reach the server. The example's is a demo "sign in as" cookie, which is not authentication. |
 | `onSuspicious` | `'flag'` | `'refuse'` answers 422 when the report matches the prompt-injection patterns ([Prompt injection](#prompt-injection)); the browser keeps it and shows the reason. `'flag'` leaves it to the ingester. |
+| `suspiciousLabel` | `suspicious` | The ingester's flag, for `'moderate'` and the worker queue. |
 | `onJournaled(clientId)` | kick the ingester | |
 | `worker` | none | A `createWorkerDispatch()`: serves `{base}/worker`. |
 | `workerToken` | `$FEEDBACK_WORKER_TOKEN` | Bearer token for your dev agents: reads and updates issues with no session. Set it whenever `authorize` is set. A function is read per request. |
@@ -144,6 +154,7 @@ The server also accepts `client_id`, an optional `title` (from agents filing thr
 | `screen` | none | An extra prompt-injection screen, `(input, signal) => Promise<{ action, reasons }>`; `anthropicScreen()` reads the pictures too. The patterns always run. |
 | `onSuspicious` | `'flag'` | `'refuse'` sets a suspicious report aside in `refused/` instead of filing it flagged. |
 | `suspiciousLabel` | `suspicious` | |
+| `policy(submitter, entry)` | signed-in: implement; else triage | Who gets a fix ([Submitter policy](#submitter-policy)). Returns `{ trust: 'implement' \| 'triage', role?, why? }`; filed as a `trust:` label and `context.policy`. Throw to retry. `null`: no stamp. |
 | `screenTimeoutMs` | 20 s | A screen that fails or times out flags the report. |
 | `onFiled(issue, entry)` | none | Use it to notify a channel or start an agent (`worker.onFiled`, below). |
 
@@ -173,6 +184,36 @@ startIngester({ journal, store, generateTitle: anthropicTitle({ model: 'claude-h
   characters at most.
 - A title the sender typed is kept as given, and no model is called.
 - It runs in the ingester, never on the request.
+
+### Submitter policy
+
+Who filed a report decides what an agent may do with it without asking a person
+([docs/TRIAGE.md §3](../../docs/TRIAGE.md#3-roles--outcomes)). The ingester asks your `policy` once per
+report and stamps the answer on the issue:
+
+- `trust:implement`: an agent may build a no-brainer fix (class A) without asking.
+- `trust:triage`: an agent classifies and records it, and builds nothing; a person decides.
+
+```ts
+startIngester({
+  journal, store,
+  policy: async ({ handle, verification, via }) => {
+    const role = via === 'box' && verification === 'session' ? await roleOf(handle) : null;   // yours
+    if (role === 'admin' || role === 'member') return { trust: 'implement', role };
+    return { trust: 'triage', role: role ?? 'anonymous', why: 'only members get fixes without asking' };
+  },
+});
+```
+
+- The default trusts signed-in reporters and nobody else: no session, an unresolved user, or another
+  app over MCP (`via: 'mcp'`) is triage only.
+- A flagged report is always `trust:triage`, whatever the policy says.
+- Only a person changes it: a PATCH that adds, removes or swaps a `trust:` label, or removes the
+  `suspicious` flag, needs `authorize(req, 'moderate')`, and the worker token is refused. On GitHub, a
+  person with triage access changes the labels there; the sync brings them back.
+- A report cannot forge it: `policy`, `screening`, `reporter` and the other server keys are dropped from
+  the captured context before journaling.
+- The worker endpoint never hands an agent a flagged issue; its answer says how many it `held`.
 
 ### Prompt injection
 
@@ -291,7 +332,8 @@ const store = githubStore({
   `token` option overrides the environment, as a string or a function asked before each request (for
   a GitHub App's rotating token). With no token, reports wait in the journal.
 - **Issues.** Each report becomes an issue with the labels `feedback`, `kind:*`, `priority:*` and
-  `status:*`, created on first use. The reporter, page and captured context go in the body, with a
+  `status:*`, plus `trust:*` and `suspicious` from the ingester, created on first use. Labels people
+  change on GitHub come back to the mirror on sync. The reporter, page and captured context go in the body, with a
   hidden `<!-- feedback-kit client_id: … -->` marker. A body over 65,536 characters is cut with a note;
   the mirror keeps it whole.
 - **Idempotency.** Before creating, the store checks the mirror, then lists the repository's issues

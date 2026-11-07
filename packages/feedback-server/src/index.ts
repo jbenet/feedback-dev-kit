@@ -18,6 +18,10 @@ export {
   neutralize, screenText, patternScreen, flagNote,
   type Neutralized, type ScreenInput, type ScreenVerdict, type ScreenReport,
 } from './injection.ts';
+export {
+  defaultPolicy, checkDecision, trustLabel, isTrustLabel, TRUSTS,
+  type Trust, type Submitter, type PolicyDecision, type SubmitterPolicy,
+} from './policy.ts';
 export { anthropicScreen, type AnthropicScreenOptions } from './ai-screen.ts';
 export {
   feedbackTools, createFeedbackMcp, sendFeedback, FEEDBACK_MCP_VERSION, MCP_PROTOCOL_VERSIONS,

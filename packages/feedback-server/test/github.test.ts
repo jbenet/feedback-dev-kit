@@ -291,3 +291,17 @@ test('custom mode hands each picture the report shows to your transport and embe
   assert.match(gh.issues[0]!.body, /!\[Screenshot\]\(https:\/\/cdn\.test\/report-screenshot\.png\)/);
   assert.match(gh.issues[0]!.body, /kept on the server/);
 });
+
+test('a person who clears the suspicious flag or changes trust: on GitHub decides it for the mirror too', async (t) => {
+  const dir = await tempDir(t);
+  const gh = fakeGitHub();
+  const store = base(dir, gh);
+  await store.create(draft({ clientId: id(), attachments: [], labels: ['suspicious', 'trust:triage'] }));
+  assert.deepEqual((await store.get('0001'))?.labels, ['suspicious', 'trust:triage']);
+  gh.issues[0]!.labels = gh.issues[0]!.labels.filter((l) => l.name !== 'suspicious' && l.name !== 'trust:triage').concat({ name: 'trust:implement' });
+  gh.issues[0]!.updated_at = gh.stamp();
+  assert.equal((await store.sync()).updated, 1);
+  assert.deepEqual((await store.get('0001'))?.labels, ['trust:implement']);
+  // The reporter's handle is shown as code: no @mention, no markdown.
+  assert.match(gh.issues[0]!.body, /Reported by `ada`/);
+});

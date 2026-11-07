@@ -127,14 +127,21 @@ export function createWorkerDispatch(options: WorkerOptions): WorkerDispatch {
       await write({ ...s, worker: { id, startedAt, seenAt: t }, wokenAt: null });
       return { ok: true as const, retire: t - startedAt >= maxAgeMs, startedAt: new Date(startedAt).toISOString() };
     }),
+    // Listening starts before the lease is read: a filing between the read and the listen would
+    // otherwise be missed until the timeout.
     waitForFiling: (since, ms) => new Promise<boolean>((resolve) => {
-      void read().then((s) => {
-        if (s.filedAt !== null && s.filedAt > since) return resolve(true);
-        const done = (v: boolean) => { clearTimeout(timer); waiters.delete(hit); resolve(v); };
-        const hit = () => done(true);
-        const timer = setTimeout(() => done(false), Math.max(0, Math.min(ms, maxWaitMs)));
-        waiters.add(hit);
-      });
+      let settled = false;
+      const done = (v: boolean) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        waiters.delete(hit);
+        resolve(v);
+      };
+      const hit = () => done(true);
+      waiters.add(hit);
+      const timer = setTimeout(() => done(false), Math.max(0, Math.min(ms, maxWaitMs)));
+      void read().then((s) => { if (s.filedAt !== null && s.filedAt > since) done(true); });
     }),
     release: (id) => serial(async () => {
       const s = await read();

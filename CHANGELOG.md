@@ -12,6 +12,18 @@ Both packages share one version.
   are no longer exported from `@jbenet/feedback-react` (use `PRIORITY`, `IssueKind`, `IssuePriority`);
   `CheckedReport.kind` and `TitleInput.kind` are optional; a `GenerateTitle` may return
   `{ title, kind }`.
+- **Who gets a fix, and a red-team pass** (7 Nov 2026): the ingester stamps every issue
+  `trust:implement` or `trust:triage` from a new `policy` option (default: signed-in reporters
+  implement; no session, an unresolved user or another app over MCP, triage; a flagged report always
+  triage), with the role and reason in `context.policy`. Clearing `suspicious` or changing a `trust:`
+  label now needs `authorize(req, 'moderate')`, and the worker token never may, so a reporter can't
+  un-flag their own report. The worker endpoint no longer hands out flagged issues (`held` counts
+  them). Signed-out reports share one rate-limit bucket (`anonymousPerMinute`, 60), so a forged
+  `X-Forwarded-For` buys no fresh limit; `clientAddress` replaces the proxy headers. A report can no
+  longer forge `policy`, `screening` or `missingAttachments` in its context. The GitHub store syncs
+  labels people change on GitHub, and shows the reporter as code (no @mentions). A filing that landed
+  between a worker's long-poll read and its listen was missed until the timeout; it no longer is. The
+  README has a security section: surface, threat model, the submitter policy and what is sandboxed.
 - **Annotator keys** (31 Oct 2026): **Return** on a pending crop cuts the picture down to it in the
   editor, there and then (undo puts the rest back), and **⌘/Ctrl+Return** is Done from anywhere in the
   editor, a label being typed included. Plain Return never finishes, so it can't close the editor by
