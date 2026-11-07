@@ -5,6 +5,10 @@ answers, a background ingester that files the reports, and three places to file 
 files plus SQLite or Postgres, or files plus GitHub Issues. TypeScript, Node 20 or later, no runtime
 dependencies. The database drivers and the Anthropic SDK are optional peer dependencies.
 
+It needs no web framework: `createFeedbackHandler` returns a function from a fetch `Request` to a
+`Response`. `@jbenet/feedback-server/node` mounts it on `node:http`, Express or Connect, and
+`@jbenet/feedback-server/next` exports it as Next.js route handlers.
+
 The design and the reasons behind it are in [docs/SERVER.md](../../docs/SERVER.md). This README covers
 the API and setup.
 
@@ -62,7 +66,8 @@ export async function register() {
 }
 ```
 
-With plain Node:
+With plain Node (or Express, Connect, Vite's dev server: anything that takes a `node:http` listener),
+the same `lib/feedback.ts` and no Next.js at all. `examples/vite-app/server.ts` is a complete one:
 
 ```ts
 import { createServer } from 'node:http';
@@ -70,6 +75,9 @@ import { toNodeListener } from '@jbenet/feedback-server/node';
 createServer(toNodeListener(feedback, { fallback: yourApp })).listen(3000);
 startFeedbackIngester();
 ```
+
+Anything else that hands you a fetch `Request` (Hono on Node, Bun) can call `feedback.handle(request)` directly. The journal needs a
+real disk, so not an edge runtime.
 
 ## HTTP API
 

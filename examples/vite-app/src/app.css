@@ -1,0 +1,7 @@
+body { margin: 0; font-family: 'IBM Plex Sans', system-ui, sans-serif; background: #fbf8f3; color: #2a2622; }
+.shell { min-height: var(--app-h, 100vh); display: flex; flex-direction: column; }
+nav { display: flex; align-items: center; gap: 16px; padding: 10px 16px; border-bottom: 1px solid #e6dfd4; }
+nav a { color: inherit; }
+.spacer { flex: 1; }
+main { padding: 24px 16px; max-width: 960px; width: 100%; box-sizing: border-box; margin: 0 auto; }
+h1 { font-family: 'Fraunces Variable', serif; font-weight: 500; }
