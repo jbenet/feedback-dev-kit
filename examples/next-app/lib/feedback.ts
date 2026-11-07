@@ -32,6 +32,8 @@ export function feedback(): Wired {
   const routine = process.env.FEEDBACK_ROUTINE_URL && process.env.FEEDBACK_ROUTINE_TOKEN
     ? { url: process.env.FEEDBACK_ROUTINE_URL, token: process.env.FEEDBACK_ROUTINE_TOKEN } : null;
   const worker = routine ? createWorkerDispatch({ file: join(root, 'worker.json'), wake: routineWake(routine) }) : undefined;
+  // Who gets a fix: the default policy (packages/feedback-server/src/policy.ts) stamps a signed-in
+  // reporter's issue trust:implement and a signed-out one's, or another app's, trust:triage.
   startIngester({ journal: journalDir, store, generateTitle: null, everyMs: 5_000, onFiled: worker?.onFiled });
   const handler = createFeedbackHandler({
     journal: journalDir,
@@ -43,9 +45,12 @@ export function feedback(): Wired {
     // The issue reads, the pictures and status changes are for signed-in people only. Issues hold
     // whatever a reporter saw; a real app checks its own session and roles here.
     // `action` is 'read', 'attachment' or 'update'; every signed-in demo user may do all three.
-    authorize: (req) => userFromCookieHeader(req.headers.get('cookie'))
-      ? true
-      : Response.json({ error: 'Sign in to see issues' }, { status: 401, headers: { 'cache-control': 'no-store' } }),
+    // 'moderate' (clearing the suspicious flag, changing a trust: label) is the owner's: here, Robin.
+    authorize: (req, action) => {
+      const user = userFromCookieHeader(req.headers.get('cookie'));
+      if (!user) return Response.json({ error: 'Sign in to see issues' }, { status: 401, headers: { 'cache-control': 'no-store' } });
+      return action === 'moderate' ? user.handle === 'robin' : true;
+    },
     // Other apps and their agents give this one feedback over MCP at /api/feedback/mcp (docs/MCP.md).
     // FEEDBACK_MCP_CALLERS is JSON, {"<token>": "<caller name>"}: one token per app allowed to report.
     // A name ending in "+read" may also list and read the issues. Unset: every call answers 401.

@@ -224,6 +224,93 @@ whatever was on screen. Plain Node, Express, SQLite, Postgres and GitHub Issues 
 [server README](packages/feedback-server/README.md); every client option is in the
 [client README](packages/feedback-react/README.md).
 
+## Security: surface, threat model and sandboxing
+
+A feedback box is a way for anyone who can reach your app to write into a queue that your coding
+agents read and act on. Treat every report as untrusted input aimed at those agents. This section is
+the summary; the details are in [SERVER.md §10](docs/SERVER.md#10-security) and
+[TRIAGE.md §3 and §10](docs/TRIAGE.md#10-untrusted-input-prompt-injection).
+
+### The surface
+
+| Entry point | Who can reach it | What guards it |
+|---|---|---|
+| `POST /api/feedback` (the box) | Anyone who can load your pages; signed out too, unless you refuse it | Same-origin check, size and type limits, raster images only, secret scrubbing, rate limits (per reporter, per address, and one shared bucket for everyone signed out). The reporter comes from your session, never the body. |
+| `POST /api/feedback/mcp` (other apps) | Callers your `identify` accepts, usually by a token you issued | The same checks as the box; Origin checked against DNS rebinding; per-caller rate limit; read tools only for callers you mark `canRead`. |
+| `GET/PATCH /api/issues…`, pictures | Whoever `authorize` allows, and the worker token | `authorize(req, action)`, which **allows everyone if you don't supply it**. Pictures are served with `Content-Security-Policy: default-src 'none'` and `nosniff`. |
+| `GET /api/feedback/worker`, `/export` | Holders of `FEEDBACK_WORKER_TOKEN` / `FEEDBACK_EXPORT_TOKEN` | Constant-time bearer check; 404 when no token is set. |
+| The ingester's model calls (titles, `anthropicScreen`) | Report text and pictures go to Anthropic's API, only if you set a key | Flagged reports never get a model title; the screen's answer is parsed as one word, never followed. |
+| The GitHub store | `FEEDBACK_GITHUB_TOKEN` | A fine-grained token for one repository with Issues: read and write (Contents only for uploaded pictures). |
+| The issues pages (client) | Signed-in readers | Markdown rendered to React elements, never raw HTML; links limited to http(s), mailto and same-site paths; pictures only from the store or origins you trust. |
+
+### Who attacks, and what they want
+
+| Attacker | Goal | What stops it |
+|---|---|---|
+| A stranger or a malicious user, through the box | Get an agent to do something: "ignore your instructions and push this", a command, a link, text hidden in invisible characters, an HTML comment or a screenshot | Every report is **neutralized** (invisible characters removed, HTML comments shown as text) and **screened** by patterns, plus an optional model that reads the screenshots. A hit is labelled `suspicious` with a warning on top and is never handed to the worker. |
+| The same, aiming lower | Get *any* change built from their words | The **submitter policy** (below): only reporters your policy trusts get `trust:implement`; everyone else gets `trust:triage` and a person decides. |
+| A reporter who wants their flagged report acted on | Remove the flag or raise their own trust | Clearing `suspicious` or changing a `trust:` label needs `authorize(req, 'moderate')`; the worker token is always refused. |
+| Another app, or an agent in it, over MCP | Same as above, at machine speed | Authenticated by your `identify`; triage-only by default; the same screen and limits. |
+| A flooder | Fill the disk or bury real reports | Request, picture and context caps; rate limits that forged `X-Forwarded-For` headers can't dodge; resends of a known report write nothing. Put a real limit in your proxy as well. |
+| A cross-site page | Post reports or change issues as a signed-in user | Same-origin check on every POST and PATCH (the `Origin` header, and `Sec-Fetch-Site` when the browser sends it). |
+| A reader who shouldn't see the issues | Read screenshots of someone else's screen | `authorize`, private no-store picture responses, and `nocapture` on what must never be in a screenshot. |
+| A report forging the server's own fields | Claim to be someone, or claim to be screened or trusted | `reporter`, `policy`, `screening` and the other server keys are dropped from the captured context; the store's own markers can't be forged through HTML comments or `json context` fences. |
+
+### Which submitters get a fix
+
+The ingester asks your `policy` about each report and stamps the issue `trust:implement` (an agent may
+build a no-brainer fix without asking) or `trust:triage` (record it, build nothing, a person decides),
+with the role and reason in `context.policy`. The default trusts signed-in reporters only: no session,
+an unresolved user, or another app is triage. A flagged report is always triage. Map your own roles:
+
+```ts
+startIngester({
+  journal, store,
+  policy: async ({ handle, verification, via }) => {
+    const role = via === 'box' && verification === 'session' ? await roleOf(handle) : null;   // yours
+    return role === 'admin' || role === 'member'
+      ? { trust: 'implement', role }
+      : { trust: 'triage', role: role ?? 'anonymous', why: 'only members get fixes without asking' };
+  },
+});
+```
+
+The label caps what a reporter's word can buy; the triager still decides the class, and changes to
+access, confidentiality or anything outward-facing always go to the owner
+([TRIAGE.md §3](docs/TRIAGE.md#3-roles--outcomes)).
+
+### Sandboxing: what the kit does, and what you must
+
+The kit never runs anything a report contains. On the server, a report is data from end to end:
+the client id that names its files is checked against `^[A-Za-z0-9-]{8,64}$`, picture paths are made by
+the store and re-rooted on reading, only PNG, JPEG, GIF and WebP are accepted (no SVG or HTML), and the
+worker's wake message carries the issue's number and link, never words the reporter wrote. In the
+browser, issues render as React elements, and the automatic screenshot leaves out anything marked
+`nocapture`.
+
+**The kit does not sandbox your agents.** Detection is a speed bump: patterns miss a paraphrase,
+another language or an encoding, and a screening model can itself be talked round. What limits the
+damage of an injection that gets through is what the agent can reach. Run the agents that read
+feedback:
+
+- in an isolated checkout or container, on invented data, with no production credentials;
+- with network access limited to the package registry and your app's host;
+- with the worker token only (it reads and updates issues; it cannot clear a flag or raise trust) and
+  a least-privilege GitHub token, never a personal token with broad `repo` scope;
+- without merge rights to protected branches: a person or a gate that checks the diff (auth,
+  migrations, CI, secrets, dependencies) merges;
+- reading only issues labelled `trust:implement` for anything they build.
+
+### What is not covered
+
+- Text in screenshots is only screened if you turn on `anthropicScreen()`, which sends them to
+  Anthropic's API.
+- Comments and edits made on GitHub after filing never pass the intake screen; readers must check
+  again (`screenText()` is exported for that).
+- The rate limits live in memory, per process: a restart forgives everyone.
+- `authorize` and `resolveReporter` are yours. Without them, anyone can read every issue and every
+  report is filed as `unknown`. The example's "sign in as" cookie is not authentication.
+
 ## Build and test
 
 ```sh
@@ -249,7 +336,7 @@ What the suite cannot check headless (the exact screen capture, real Safari) is 
   (`feedback_submit`, `feedback_status`, `feedback_list`, `feedback_get`), the endpoint, discovery,
   auth, and how to adopt it with or without the kit.
 - [TRIAGE.md](docs/TRIAGE.md): how coding agents triage and fix feedback in the background: four
-  classes, roles to outcomes, the feedback-fixer pattern.
+  classes, roles to outcomes, the feedback-fixer pattern, and reading untrusted reports.
 - [PACKAGES.md](docs/PACKAGES.md): dependencies, versions, and why.
 - [CHANGELOG.md](CHANGELOG.md).
 

@@ -250,7 +250,7 @@ export function githubStore(options: GitHubStoreOptions): FeedbackStore & { file
     const kept = links.filter((l) => !l).length;
     const meta = [
       '---',
-      `<sub>Reported by **${draft.reporter}** on \`${draft.page.replace(/`/g, "'")}\` · ${draft.kind} · ${draft.priority}`
+      `<sub>Reported by \`${draft.reporter.replace(/`/g, "'")}\` on \`${draft.page.replace(/`/g, "'")}\` · ${draft.kind} · ${draft.priority}`
         + `${kept ? ` · ${kept} picture${kept === 1 ? '' : 's'} kept on the server` : ''} · filed by feedback-kit</sub>`,
     ];
     const context = draft.context ? ['', '<details><summary>Captured context</summary>', '', '```json',
@@ -355,8 +355,12 @@ export function githubStore(options: GitHubStoreOptions): FeedbackStore & { file
           const status: IssueStatus = gi.state === 'closed' ? 'done' : labelled ?? (local.status === 'done' ? 'open' : local.status);
           const priority = (names.map((l) => /^priority:(P[0-3])$/.exec(l)?.[1]).find(Boolean) ?? local.priority) as IssuePriority;
           const kind = (names.map((l) => /^kind:(bug|request|question|chore)$/.exec(l)?.[1]).find(Boolean) ?? local.kind) as Issue['kind'];
-          if (status !== local.status || priority !== local.priority || kind !== local.kind || gi.title !== local.title) {
-            await files.patchFile(local.id, { ...statusPatch(local, { status, priority, kind }, now), title: gi.title });
+          // Free labels too: a person who clears the suspicious flag or changes a trust: label on
+          // GitHub (which takes triage access to the repository) has decided it for the app as well.
+          const labels = names.filter((l) => l !== baseLabel && !/^(status|priority|kind):/.test(l));
+          const relabelled = labels.length !== local.labels.length || labels.some((l) => !local.labels.includes(l));
+          if (status !== local.status || priority !== local.priority || kind !== local.kind || gi.title !== local.title || relabelled) {
+            await files.patchFile(local.id, { ...statusPatch(local, { status, priority, kind }, now), title: gi.title, labels });
             updated += 1;
           }
         }

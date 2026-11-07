@@ -72,10 +72,12 @@ test('the ingester flags a suspicious report: label, warning on top, no model ti
   assert.deepEqual(await ingester.runOnce(), { filed: 2, refused: 0, failed: 0, waiting: 0 });
   const [honest, bad] = [(await store.get('0001'))!, (await store.get('0002'))!];
   assert.equal(honest.title, 'A model title');
-  assert.deepEqual(honest.labels, []);
+  assert.deepEqual(honest.labels, ['trust:implement']);
   assert.equal(honest.context?.screening, undefined);
   assert.equal(titleCalls(), 1);
-  assert.deepEqual(bad.labels, ['suspicious']);
+  // Flagged: held for a person, and never a fix without asking, whoever filed it.
+  assert.deepEqual(bad.labels, ['suspicious', 'trust:triage']);
+  assert.deepEqual(bad.context?.policy, { trust: 'triage', role: 'member', why: 'flagged as a possible prompt injection' });
   assert.match(bad.body, /^> \[!WARNING\]\n> \*\*Flagged by feedback-kit as a possible prompt injection\*\* \(asks to ignore instructions\)/);
   assert.match(bad.body, /<\\!-- hidden -->/);
   assert.equal(bad.title, 'The save button is broken');
@@ -93,7 +95,7 @@ test('onSuspicious refuse sets the report aside; a screen that throws flags rath
   const broken = await setup(t, { screen: async () => { throw new Error('model down'); } });
   await broken.add(HONEST[0]!);
   await broken.ingester.runOnce();
-  assert.deepEqual((await broken.store.get('0001'))?.labels, ['suspicious']);
+  assert.deepEqual((await broken.store.get('0001'))?.labels, ['suspicious', 'trust:triage']);
 
   const picky = await setup(t, { screen: async () => ({ action: 'refuse', reasons: ['model: instructions in the screenshot'] }) });
   await picky.add(HONEST[0]!, { screenshots: [PNG] });
