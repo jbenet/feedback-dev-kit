@@ -27,11 +27,17 @@ import { createJournal, type Journal } from './journal.ts';
 import { checkOrigin, type OriginPolicy } from './origin.ts';
 import { STATUSES, KINDS, PRIORITIES, type FeedbackStore, type IssueFilter, type IssuePatch, type IssueStatus, type IssueKind, type IssuePriority } from './types.ts';
 import { patternScreen } from './injection.ts';
+import { isTrustLabel } from './policy.ts';
 import { createFeedbackMcp, type FeedbackMcpOptions } from './mcp.ts';
 import type { WorkerDispatch } from './worker.ts';
 import { checkReport, DEFAULT_LIMITS, isClientId, newClientId, type Limits } from './validate.ts';
 
-export type Action = 'read' | 'update' | 'attachment';
+/**
+ * What a request wants. 'moderate' is a label change that decides what agents may do: removing the
+ * `suspicious` flag, or adding, removing or swapping a `trust:` label (policy.ts). Give it only to
+ * the people who own the product; the worker token never has it.
+ */
+export type Action = 'read' | 'update' | 'attachment' | 'moderate';
 
 export interface HandlerOptions {
   /** The journal, or its folder (e.g. `issues/inbox`). */
@@ -46,7 +52,22 @@ export interface HandlerOptions {
    * New reports per reporter (or per client address when there is no reporter) per minute. Resends of
    * a known client id are free: they write nothing. Default 30 (GUESS); false turns it off.
    */
-  rateLimit?: { perMinute: number } | false;
+  rateLimit?: {
+    perMinute: number;
+    /**
+     * New reports with no reporter (nobody signed in), all senders together, per minute. The per-address
+     * limit can be dodged by anyone who varies the address they claim; this one cannot. Default 60 (GUESS).
+     */
+    anonymousPerMinute?: number;
+  } | false;
+  /**
+   * The sender's address, for the per-address limit on reports with no reporter. Default: X-Real-IP,
+   * then the first X-Forwarded-For hop, which a client can set unless a proxy you run overwrites them.
+   * Behind such a proxy, keep the default; otherwise return the address your server saw.
+   */
+  clientAddress?: (req: Request) => string | null | undefined;
+  /** The label the ingester flags with (its suspiciousLabel). Default 'suspicious'. */
+  suspiciousLabel?: string;
   /**
    * Who is reporting, from your session: a cookie, a header your auth proxy sets. Must be fast and
    * must not wait on a database — resolve further in the ingester's identify(). Return null when
@@ -123,6 +144,8 @@ export function createFeedbackHandler(options: HandlerOptions): FeedbackHandler 
   const issuesPath = (options.issuesPath ?? '/api/issues').replace(/\/$/, '');
   const under = (pathname: string, prefix: string) => pathname === prefix || pathname.startsWith(`${prefix}/`);
   const perMinute = options.rateLimit === false ? 0 : options.rateLimit?.perMinute ?? 30;
+  const anonymousPerMinute = options.rateLimit === false ? 0 : options.rateLimit?.anonymousPerMinute ?? 60;
+  const suspiciousLabel = options.suspiciousLabel ?? 'suspicious';
   /** New reports in the last minute, per sender. In memory: a restart forgives everyone. */
   const recent = new Map<string, number[]>();
   const limits: Limits = { ...DEFAULT_LIMITS, ...options.limits };
@@ -194,20 +217,28 @@ export function createFeedbackHandler(options: HandlerOptions): FeedbackHandler 
       reporter = typeof who === 'string' && who.trim() ? who.trim().slice(0, 200) : null;
     } catch { reporter = null; }
 
-    const sender = reporter ?? `addr:${req.headers.get('x-real-ip') ?? req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'}`;
-    if (perMinute > 0) {
-      const cutoff = Date.now() - 60_000;
-      const times = (recent.get(sender) ?? []).filter((t) => t > cutoff);
-      recent.set(sender, times);
-      if (times.length >= perMinute && !(await journal.status(clientId))) {
+    const address = options.clientAddress
+      ? options.clientAddress(req)
+      : req.headers.get('x-real-ip') ?? req.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+    const sender = reporter ?? `addr:${address || 'unknown'}`;
+    // Signed-out reports also share one bucket: a varied X-Forwarded-For must not buy a fresh limit.
+    const buckets: Array<[string, number]> = [[sender, perMinute], ...(reporter ? [] : [['anonymous', anonymousPerMinute] as [string, number]])];
+    const cutoff = Date.now() - 60_000;
+    const recentIn = (key: string) => {
+      const times = (recent.get(key) ?? []).filter((t) => t > cutoff);
+      recent.set(key, times);
+      return times;
+    };
+    for (const [key, max] of buckets) {
+      if (max > 0 && recentIn(key).length >= max && !(await journal.status(clientId))) {
         return json({ error: 'Too many reports in a minute. This one is kept in your browser and sent shortly.', clientId }, 429, { 'retry-after': '60' });
       }
-      if (recent.size > 10_000) for (const [k, v] of recent) if (!v.some((t) => t > cutoff)) recent.delete(k);
     }
+    if (recent.size > 10_000) for (const [k, v] of recent) if (!v.some((t) => t > cutoff)) recent.delete(k);
 
     try {
       const done = await journal.write({ clientId, reporter, report: checked.value });
-      if (done.already === null && perMinute > 0) recent.get(sender)?.push(Date.now());
+      if (done.already === null) for (const [key, max] of buckets) if (max > 0) recent.get(key)?.push(Date.now());
       if (done.already === 'refused') return json({ error: done.reason, clientId, state: 'refused' }, 422);
       if (done.already === null) {
         try { journaled(clientId); } catch { /* filing is someone else's problem; the report is safe */ }
@@ -297,7 +328,25 @@ export function createFeedbackHandler(options: HandlerOptions): FeedbackHandler 
         }
         patch.labels = body.labels as string[];
       }
-      if (!(await store.get(id))) return json({ error: 'Not found.' }, 404);
+      const current = await store.get(id);
+      if (!current) return json({ error: 'Not found.' }, 404);
+      // Clearing a flag or changing who gets a fix is a person's call: the worker token may add the
+      // flag, never take it away, and the app's authorize decides who else may.
+      if (patch.labels) {
+        const next = new Set(patch.labels);
+        const before = new Set(current.labels);
+        const unflags = before.has(suspiciousLabel) && !next.has(suspiciousLabel);
+        const trustChanged = [...next].some((l) => isTrustLabel(l) && !before.has(l)) || [...before].some((l) => isTrustLabel(l) && !next.has(l));
+        if (unflags || trustChanged) {
+          const why = unflags ? `clear the ${suspiciousLabel} flag` : 'change a trust: label';
+          if (isWorker(req)) return json({ error: `Only a person may ${why}.` }, 403);
+          if (options.authorize) {
+            const verdict = await options.authorize(req, 'moderate');
+            if (verdict instanceof Response) return verdict;
+            if (!verdict) return json({ error: `Not allowed to ${why}.` }, 403);
+          }
+        }
+      }
       return json({ issue: await store.update(id, patch) });
     }
     return json({ error: 'Method not allowed.' }, 405, { allow: 'GET, PATCH' });
@@ -326,8 +375,10 @@ export function createFeedbackHandler(options: HandlerOptions): FeedbackHandler 
       lease = await dispatch.checkIn(id); // the wait counts as being alive
       if (!lease.ok) return json({ error: 'Another worker holds the queue. Exit.', holder: lease.holder, seenAt: lease.seenAt }, 409);
     }
-    const issues = (await store.list({ status: ['open'] })).sort((a, b) => a.created.localeCompare(b.created));
-    return json({ retire: lease.retire, startedAt: lease.startedAt, cursor, issues });
+    // A flagged report waits for a person: the worker is not handed it at all.
+    const open = (await store.list({ status: ['open'] })).sort((a, b) => a.created.localeCompare(b.created));
+    const issues = open.filter((i) => !i.labels.includes(suspiciousLabel));
+    return json({ retire: lease.retire, startedAt: lease.startedAt, cursor, issues, held: open.length - issues.length });
   }
 
   async function attachment(req: Request, rest: string[]): Promise<Response> {

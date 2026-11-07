@@ -16,6 +16,7 @@ import { performance } from 'node:perf_hooks';
 import { defaultGenerateTitle, type GenerateTitle } from './ai-title.ts';
 import { createJournal, type Journal } from './journal.ts';
 import { flagNote, neutralize, patternScreen, type ScreenInput, type ScreenReport, type ScreenVerdict } from './injection.ts';
+import { checkDecision, defaultPolicy, trustLabel, type PolicyDecision, type SubmitterPolicy } from './policy.ts';
 import { sanitizeTitle, titleFrom } from './title.ts';
 import { RefusedError, RetryLaterError, type FeedbackStore, type Issue, type IssueDraft, type JournalEntry } from './types.ts';
 
@@ -61,6 +62,13 @@ export interface IngesterOptions {
   suspiciousLabel?: string;
   /** GUESS: a screen is worth a few seconds, like a title. A screen that fails or times out flags the report. */
   screenTimeoutMs?: number;
+  /**
+   * Who gets a fix (policy.ts): each report is stamped `trust:implement` (an agent may build a
+   * no-brainer fix without asking) or `trust:triage` (record it, build nothing), with the role and
+   * reason in context.policy. Default: signed-in reporters implement; no session, an unresolved user
+   * or another app over MCP, triage. A flagged report is always triage. null: no stamp.
+   */
+  policy?: SubmitterPolicy | null;
   /** After an issue is filed (notify a channel, kick an agent). Errors are logged and ignored. */
   onFiled?: (issue: Issue, entry: JournalEntry) => unknown;
   logger?: Pick<Console, 'warn' | 'info'>;
@@ -103,6 +111,7 @@ export function createIngester(options: IngesterOptions): Ingester {
   const onSuspicious = options.onSuspicious ?? 'flag';
   const suspiciousLabel = options.suspiciousLabel ?? 'suspicious';
   const screenTimeout = options.screenTimeoutMs ?? 20_000;
+  const policy = options.policy === undefined ? defaultPolicy : options.policy;
   let pausedUntil = 0;
   let running: Promise<IngestResult> | null = null;
   let again = false;
@@ -182,13 +191,20 @@ export function createIngester(options: IngesterOptions): Ingester {
     screened.set(entry.clientId, verdict);
     if (verdict.action === 'refuse') throw new RefusedError(`Refused as a possible prompt injection: ${verdict.reasons.join('; ')}`);
     const flagged = verdict.action === 'flag';
+    // Who gets a fix. Asked after the screen, so a refused report costs no lookup; a throw retries.
+    let decided: PolicyDecision | null = null;
+    if (policy) {
+      decided = checkDecision(await policy({ ...reporter, via: entry.reporter?.startsWith('mcp:') ? 'mcp' : 'box' }, entry));
+      if (flagged && decided.trust === 'implement') decided = { ...decided, trust: 'triage', why: 'flagged as a possible prompt injection' };
+    }
     const body = cleaned.text || '(no description given)';
     const base: Omit<IssueDraft, 'title'> = {
       body: flagged ? `${flagNote(verdict.reasons)}\n${body}` : body,
       kind: r.kind, priority: r.priority, reporter: reporter.handle, page: r.page,
-      labels: flagged ? [suspiciousLabel] : [],
+      labels: [...(flagged ? [suspiciousLabel] : []), ...(decided ? [trustLabel(decided.trust)] : [])],
       context: {
         ...context,
+        ...(decided ? { policy: decided } : {}),
         ...(cleaned.changes.length || flagged ? { screening: { ...(flagged ? { flagged: verdict.reasons } : {}), ...(cleaned.changes.length ? { neutralized: cleaned.changes } : {}) } } : {}),
       },
       attachments, tokenOffset: r.imageOffset, clientId: entry.clientId, receivedAt: entry.receivedAt,
